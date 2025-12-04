@@ -1,11 +1,7 @@
-// lib/db/database_helper.dart
-
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  // singleton : une seule instance dans toute l'application
   DatabaseHelper._internal();
   static final DatabaseHelper instance = DatabaseHelper._internal();
 
@@ -17,11 +13,9 @@ class DatabaseHelper {
     return _database!;
   }
 
-  // Ouverture / création physique du fichier.db de la BDD
+  // Ouverture / creation physique du fichier .db (mobile/desktop)
   Future<Database> _initDatabase() async {
-    final documentDir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(documentDir.path, 'explorez_ville.db');
-
+    final dbPath = p.join(await getDatabasesPath(), 'explorez_ville.db');
     return await openDatabase(
       dbPath,
       version: 1,
@@ -30,13 +24,12 @@ class DatabaseHelper {
     );
   }
 
-  //Activation des clés étrangères (important pour on DELETE CASCADE)
+  // Activation des cles etrangeres (important pour ON DELETE CASCADE)
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // Table VILLE
     await db.execute('''
       CREATE TABLE ville (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +42,7 @@ class DatabaseHelper {
         is_exploree INTEGER NOT NULL DEFAULT 0
       );
     ''');
-    // Table LIEU
+
     await db.execute('''
       CREATE TABLE lieu (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +57,6 @@ class DatabaseHelper {
       );
     ''');
 
-    // Table COMMENTAIRE
     await db.execute('''
       CREATE TABLE commentaire (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
