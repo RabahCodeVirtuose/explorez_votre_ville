@@ -1,13 +1,17 @@
 import 'package:explorez_votre_ville/api/api_villes.dart';
 import 'package:flutter/material.dart'; // Material
-import 'package:flutter_map/flutter_map.dart'; // Carte OSM
+import 'package:flutter_map/flutter_map.dart'; // MapController
 import 'package:latlong2/latlong.dart'; // Coordonnees
 import 'package:provider/provider.dart'; // Provider
 
 import '../models/lieu_type.dart'; // Types de lieux
 import '../providers/ville_provider.dart'; // Etat ville/meteo
-import '../utils/lieu_type_mapper.dart'; // Labels lieux
 import '../widgets/carte_meteo.dart'; // Carte meteo
+import '../widgets/error_banner.dart';
+import '../widgets/favorite_cards_bar.dart';
+import '../widgets/lieu_type_chips.dart';
+import '../widgets/map_section.dart';
+import '../widgets/search_bar.dart';
 
 class EcranListeVilles extends StatefulWidget {
   const EcranListeVilles({super.key});
@@ -41,26 +45,6 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     final centre = provider.mapCenter; // Centre calcule
     setState(() => _center = centre); // Met a jour centre local
     _mapController.move(centre, 12); // Deplace la carte
-  }
-
-  Widget _buildChips(VilleProvider provider) {
-    // Liste des types de lieux sous forme de chips
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final t in LieuType.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(LieuTypeHelper.label(t)),
-                selected: provider.type == t,
-                onSelected: (_) => provider.changerType(t),
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   Widget _buildLieux(VilleProvider provider) {
@@ -139,6 +123,19 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     };
   }
 
+  String _friendlyError(String raw) {
+    // Nettoie le préfixe "Exception" pour un message plus pro
+    final sanitized = raw.replaceFirst(
+      RegExp(r'exception[: ]*', caseSensitive: false),
+      '',
+    );
+    final lower = sanitized.toLowerCase();
+    if (lower.contains('city not found') || lower.contains('404')) {
+      return 'Ville introuvable. Vérifie l’orthographe ou essaie une autre ville.';
+    }
+    return 'Oups… $sanitized'.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<VilleProvider>(); // Ecoute l'etat
@@ -157,27 +154,14 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
           padding: const EdgeInsets.all(12), // Marges
           child: Column(
             children: [
-              TextField(
-                controller: _controller, // Saisie texte
-                decoration: InputDecoration(
-                  hintText: 'Rechercher une ville…', // Placeholder
-                  prefixIcon: const Icon(Icons.search), // Icone
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12), // Coins arrondis
-                  ),
-                ),
-                onSubmitted: _onSearch, // Declenche recherche
-              ),
+              SearchBarField(controller: _controller, onSubmitted: _onSearch),
               const SizedBox(height: 12), // Espacement
               if (provider.loading)
                 const LinearProgressIndicator(), // Barre chargement
               if (provider.error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8), // Marge haute
-                  child: Text(
-                    provider.error!, // Message erreur
-                    style: const TextStyle(color: Colors.red), // Style erreur
-                  ),
+                  child: ErrorBanner(message: _friendlyError(provider.error!)),
                 ),
               if (meteo != null) ...[
                 const SizedBox(height: 12), // Espacement
@@ -211,189 +195,24 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
                 ),
               ],
               const SizedBox(height: 12), // Espacement
-              _buildChips(provider), // Selection type de lieux
+              LieuTypeChips(
+                selected: provider.type,
+                onSelected: provider.changerType,
+              ),
               const SizedBox(height: 12), // Espacement
-              SizedBox(
-                height: 220,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12), // Coins arrondis
-                  child: Container(
-                    color: const Color(0xFFF6F1E9), // Fond beige
-                    child: FlutterMap(
-                      mapController: _mapController, // Controleur carte
-                      options: MapOptions(
-                        initialCenter: _center, // Centre initial
-                        initialZoom: 12, // Zoom initial
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              //"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", // Style voyager // j'ai juste retiré un {r} ici, que donnait un warning au terminal
-                              "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", // Avec ce lien pas de warning sur flutterMap
-                          subdomains: const [
-                            'a',
-                            'b',
-                            'c',
-                            'd',
-                          ], // Sous-domaines
-                          userAgentPackageName:
-                              'com.explorez.votre.ville', // UA
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _center, // Position du marker
-                              width: 40,
-                              height: 40,
-                              child: const Icon(
-                                Icons.location_on, // Icone position
-                                color: Colors.red, // Couleur marker
-                                size: 36, // Taille
-                              ),
-                            ),
-                          ],
-                        ),
-                        ///////////////////////////////////MarkerLayer pour les POI
-                        MarkerLayer(
-                          markers: poiMarkers.map((p) {
-                            // -- On pouura eventuellement adapter la taille pour le marqueur ---
-                            // La largeur doit être suffisante pour contenir l'icône et le texte.
-                            const double markerHeight = 40.0;
-                            const double markerWidth = 150.0;
-
-                            return Marker(
-                              point: LatLng(p.lat, p.lon),
-                              width: markerWidth,
-                              height: markerHeight,
-
-                              // Le 'child' contient la combinaison Icône + Texte
-                              child: GestureDetector(
-                                onTap: () {
-                                  // 🚨 IMPORTANT : Déclencher la boîte de dialogue ici
-                                  _showPoiDetailsDialog(context, p);
-                                },
-                                child: Row(
-                                  mainAxisSize: MainAxisSize
-                                      .min, // La Row ne prend que l'espace nécessaire
-                                  children: [
-                                    // 1. L'Icône du Marqueur (le pin)
-                                    const Icon(
-                                      Icons.location_pin,
-                                      color: Colors.blue,
-                                      size: 32,
-                                    ),
-
-                                    // 2. Un petit espace
-                                    const SizedBox(width: 4),
-
-                                    // 3. Le nom du POI (p.name provient de votre classe Place)
-                                    // Le widget Flexible empêche le texte très long de déborder de l'écran.
-                                    Flexible(
-                                      child: Text(
-                                        p.name, // <-- Utilisation du nom
-                                        style: const TextStyle(
-                                          color: Colors.black,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                          backgroundColor: Colors
-                                              .white70, // Optionnel : pour que le texte soit lisible sur la carte
-                                        ),
-                                        overflow: TextOverflow
-                                            .ellipsis, // Coupe avec "..." si trop long
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        //////////////////////////////////////////////////////////////////////////////MarkerLayer pour les POI
-                      ],
-                    ),
-                  ),
-                ),
+              MapSection(
+                mapController: _mapController,
+                center: _center,
+                poiMarkers: poiMarkers,
+                onPoiTap: (p) => _showPoiDetailsDialog(context, p),
               ),
               const SizedBox(height: 12),
               //Expanded(child: _buildLieux(provider)), // Liste des lieux
-              buildFavoriteCardsBar(),
+              const FavoriteCardsBar(),
             ],
           ),
         ),
       ),
     );
   }
-}
-
-Widget buildFavoriteCardsBar() {
-  // Liste statique des lieux favoris (pour la maquette)
-  final List<Map<String, dynamic>> staticFavorites = [
-    {'name': 'Musée', 'icon': Icons.museum, 'color': Colors.purple},
-    {'name': 'Restaurant', 'icon': Icons.restaurant, 'color': Colors.orange},
-    {'name': 'Parc Central', 'icon': Icons.park, 'color': Colors.green},
-    {'name': 'Théâtre', 'icon': Icons.theater_comedy, 'color': Colors.red},
-    {'name': 'Cinéma', 'icon': Icons.movie, 'color': Colors.blue},
-    {'name': 'Musée', 'icon': Icons.museum, 'color': Colors.purple},
-    {'name': 'Restaurant', 'icon': Icons.restaurant, 'color': Colors.orange},
-    {'name': 'Parc Central', 'icon': Icons.park, 'color': Colors.green},
-    {'name': 'Théâtre', 'icon': Icons.theater_comedy, 'color': Colors.red},
-    {'name': 'Cinéma', 'icon': Icons.movie, 'color': Colors.blue},
-  ];
-
-  return SizedBox(
-    height: 100, // <--- Hauteur Fixe de la barre (ListView)
-    child: ListView.builder(
-      scrollDirection: Axis.horizontal, // <--- Mode Horizontal
-      itemCount: staticFavorites.length,
-      itemBuilder: (context, index) {
-        final favorite = staticFavorites[index];
-
-        return Padding(
-          // Marge pour espacement, le 16.0 au début assure la marge de gauche
-          padding: EdgeInsets.fromLTRB(index == 0 ? 16 : 4, 8, 4, 8),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            // Utilisation d'un InkWell pour la gestion future du clic (si vous le souhaitez)
-            child: InkWell(
-              onTap: () {
-                // Logique future : naviguer vers la carte ou filtrer
-                print('Clic sur favori: ${favorite['name']}');
-              },
-              child: Container(
-                width: 120, // <--- Largeur fixe de la Card
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Column(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center, // Centrage vertical du contenu
-                  children: [
-                    // Icône
-                    Icon(
-                      favorite['icon'] as IconData,
-                      color: favorite['color'] as Color,
-                      size: 35, // Icône légèrement plus grande
-                    ),
-                    const SizedBox(height: 4),
-                    // Nom du favori
-                    Text(
-                      favorite['name'] as String,
-                      textAlign: TextAlign.center,
-                      maxLines: 2, // Permet deux lignes de texte
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    ),
-  );
 }
