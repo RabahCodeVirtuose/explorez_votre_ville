@@ -168,7 +168,7 @@ class VilleProvider with ChangeNotifier {
       final data = await ApiVillesEtLieux.fetchLieuxPourVille(
         nomVille: _lastQuery!,
         type: type,
-        limit: 50,
+        limit: 15,
       );
       _lieux = data;
     } catch (e) {
