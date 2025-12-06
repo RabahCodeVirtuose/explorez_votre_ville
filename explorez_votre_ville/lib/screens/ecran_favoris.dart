@@ -17,7 +17,9 @@ class _EcranFavorisState extends State<EcranFavoris> {
   @override
   void initState() {
     super.initState();
-    _favorisFuture = context.read<VilleProvider>().chargerFavoris();
+    final provider = context.read<VilleProvider>();
+    provider.chargerPinnedDepuisPrefs();
+    _favorisFuture = provider.chargerFavoris();
   }
 
   @override
@@ -46,18 +48,36 @@ class _EcranFavorisState extends State<EcranFavoris> {
           if (favoris.isEmpty) {
             return const Center(child: Text('Aucune ville favorite.'));
           }
+          final pinnedId = context.watch<VilleProvider>().pinnedVilleId;
           return ListView.separated(
             itemCount: favoris.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final v = favoris[index];
+              final isPinned = pinnedId != null && v.id == pinnedId;
               return ListTile(
                 leading: const Icon(Icons.location_city),
                 title: Text(v.nom),
                 subtitle: Text(
-                  '${v.pays ?? ''} • '
+                  '${v.pays ?? ''} '
                   'Lat:${v.latitude?.toStringAsFixed(4) ?? '-'} '
                   'Lon:${v.longitude?.toStringAsFixed(4) ?? '-'}',
+                ),
+                trailing: IconButton(
+                  tooltip: isPinned ? 'Désépingler' : 'Épingler',
+                  icon: Icon(
+                    isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    color: isPinned ? Colors.orange : null,
+                  ),
+                  onPressed: () async {
+                    final provider = context.read<VilleProvider>();
+                    if (isPinned) {
+                      await provider.deseEpinglerVille();
+                    } else {
+                      await provider.epinglerVille(v);
+                    }
+                    setState(() {});
+                  },
                 ),
               );
             },

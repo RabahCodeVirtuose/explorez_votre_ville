@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_meteo.dart';
 import '../api/api_villes.dart';
@@ -25,6 +26,7 @@ class VilleProvider with ChangeNotifier {
   bool _loadingLieux = false;
   bool _isFavoriActuel = false;
   List<Lieu> _lieuxFavoris = <Lieu>[];
+  int? _pinnedVilleId;
 
   final VilleRepository _villeRepo = VilleRepository();
   final LieuRepository _lieuRepo = LieuRepository();
@@ -38,6 +40,7 @@ class VilleProvider with ChangeNotifier {
   bool get loadingLieux => _loadingLieux;
   bool get isFavoriActuel => _isFavoriActuel;
   List<Lieu> get lieuxFavoris => _lieuxFavoris;
+  int? get pinnedVilleId => _pinnedVilleId;
 
   LatLng get mapCenter {
     if (_weather != null) return _weather!.coordonnees;
@@ -56,6 +59,7 @@ class VilleProvider with ChangeNotifier {
     _loadingLieux = false;
     _isFavoriActuel = false;
     _lieuxFavoris = <Lieu>[];
+    _pinnedVilleId = null;
     notifyListeners();
   }
 
@@ -113,6 +117,35 @@ class VilleProvider with ChangeNotifier {
     } else {
       _lieuxFavoris = <Lieu>[];
       notifyListeners();
+    }
+  }
+
+  Future<void> chargerPinnedDepuisPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _pinnedVilleId = prefs.getInt('pinned_ville_id');
+    notifyListeners();
+  }
+
+  Future<void> epinglerVille(Ville ville) async {
+    if (ville.id == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('pinned_ville_id', ville.id!);
+    _pinnedVilleId = ville.id;
+    notifyListeners();
+  }
+
+  Future<void> deseEpinglerVille() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('pinned_ville_id');
+    _pinnedVilleId = null;
+    notifyListeners();
+  }
+
+  Future<void> afficherVilleEpinglee() async {
+    if (_pinnedVilleId == null) return;
+    final ville = await _villeRepo.getVilleById(_pinnedVilleId!);
+    if (ville != null) {
+      await chercherVille(ville.nom);
     }
   }
 

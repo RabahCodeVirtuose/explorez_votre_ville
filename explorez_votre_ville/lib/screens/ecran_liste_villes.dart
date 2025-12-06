@@ -35,6 +35,9 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
       provider.reset(); // Vide la derniere recherche
       setState(() => _center = const LatLng(48.8566, 2.3522)); // Centre defaut
       _mapController.move(_center, 12); // Deplace la carte
+      provider.chargerPinnedDepuisPrefs().then(
+        (_) => provider.afficherVilleEpinglee(),
+      ); // Charge ville épinglée si présente
     });
   }
 
@@ -136,6 +139,14 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     final meteo = provider.weather; // Donnees meteo
     final poiMarkers = provider.lieux; // Récupère la liste des lieux
     final favoris = provider.lieuxFavoris;
+    final currentCenter = provider.mapCenter;
+    if (_center.latitude != currentCenter.latitude ||
+        _center.longitude != currentCenter.longitude) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() => _center = currentCenter);
+        _mapController.move(currentCenter, 12);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Explorer une ville')), // Titre
