@@ -3,7 +3,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../api/api_meteo.dart';
 import '../api/api_villes.dart';
+import '../db/repository/lieu_repository.dart';
 import '../db/repository/ville_repository.dart';
+import '../models/lieu.dart';
 import '../models/lieu_type.dart';
 import '../models/weather_data.dart';
 import '../models/ville.dart';
@@ -22,8 +24,10 @@ class VilleProvider with ChangeNotifier {
   LieuType _type = LieuType.parc;
   bool _loadingLieux = false;
   bool _isFavoriActuel = false;
+  List<Lieu> _lieuxFavoris = <Lieu>[];
 
   final VilleRepository _villeRepo = VilleRepository();
+  final LieuRepository _lieuRepo = LieuRepository();
 
   WeatherData? get weather => _weather;
   VilleApiResult? get ville => _ville;
@@ -33,6 +37,7 @@ class VilleProvider with ChangeNotifier {
   LieuType get type => _type;
   bool get loadingLieux => _loadingLieux;
   bool get isFavoriActuel => _isFavoriActuel;
+  List<Lieu> get lieuxFavoris => _lieuxFavoris;
 
   LatLng get mapCenter {
     if (_weather != null) return _weather!.coordonnees;
@@ -50,6 +55,7 @@ class VilleProvider with ChangeNotifier {
     _type = LieuType.parc;
     _loadingLieux = false;
     _isFavoriActuel = false;
+    _lieuxFavoris = <Lieu>[];
     notifyListeners();
   }
 
@@ -71,6 +77,43 @@ class VilleProvider with ChangeNotifier {
     final existing = await _trouverVilleParNom(_weather!.cityName);
     _isFavoriActuel = existing?.isFavorie == true;
     notifyListeners();
+  }
+
+  Future<Ville?> _getOrInsertVilleCourante() async {
+    if (_weather == null) return null;
+    // Cherche en base
+    final existing = await _trouverVilleParNom(_weather!.cityName);
+    if (existing != null) return existing;
+
+    // Insère si absente (en conservant le statut favori courant)
+    final nouvelle = Ville(
+      nom: _weather!.cityName,
+      latitude: _weather?.coordonnees.latitude,
+      longitude: _weather?.coordonnees.longitude,
+      isFavorie: _isFavoriActuel,
+    );
+    final id = await _villeRepo.insertVille(nouvelle);
+    return nouvelle.copyWith(id: id);
+  }
+
+  Future<void> _chargerLieuxFavorisPourVille(Ville ville) async {
+    _lieuxFavoris = await _lieuRepo.getLieuxByVilleId(ville.id!);
+    notifyListeners();
+  }
+
+  Future<void> _chargerFavorisVilleCourante() async {
+    if (_weather == null) {
+      _lieuxFavoris = <Lieu>[];
+      notifyListeners();
+      return;
+    }
+    final v = await _trouverVilleParNom(_weather!.cityName);
+    if (v?.id != null) {
+      await _chargerLieuxFavorisPourVille(v!);
+    } else {
+      _lieuxFavoris = <Lieu>[];
+      notifyListeners();
+    }
   }
 
   Future<void> marquerFavori(Ville ville) async {
@@ -118,6 +161,7 @@ class VilleProvider with ChangeNotifier {
       _weather = meteo;
       await _chargerLieux(type: _type);
       await _synchroniserFavoriActuel();
+      await _chargerFavorisVilleCourante();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -155,6 +199,35 @@ class VilleProvider with ChangeNotifier {
     await _synchroniserFavoriActuel();
   }
 
+  Future<void> ajouterLieuFavori(LieuApiResult poi) async {
+    if (_weather == null) return;
+
+    // S'assure que la ville courante est présente en base
+    final villeCourante = await _getOrInsertVilleCourante();
+    if (villeCourante == null || villeCourante.id == null) return;
+
+    // Evite les doublons (nom + ville)
+    final deja = await _lieuRepo.getLieuByNomEtVille(
+      poi.name,
+      villeCourante.id!,
+    );
+    if (deja != null) {
+      await _chargerLieuxFavorisPourVille(villeCourante);
+      return;
+    }
+
+    final lieu = Lieu(
+      villeId: villeCourante.id!,
+      nom: poi.name.isEmpty ? '(Sans nom)' : poi.name,
+      type: _type,
+      latitude: poi.lat,
+      longitude: poi.lon,
+      description: poi.formattedAddress,
+    );
+    await _lieuRepo.insertLieu(lieu);
+    await _chargerLieuxFavorisPourVille(villeCourante);
+  }
+
   Future<void> _chargerLieux({required LieuType type}) async {
     if (_lastQuery == null || _lastQuery!.isEmpty) {
       _lieux = <LieuApiResult>[];
@@ -162,6 +235,8 @@ class VilleProvider with ChangeNotifier {
       return;
     }
 
+    // Vider la liste actuelle pour éviter d'afficher les anciens marqueurs
+    _lieux = <LieuApiResult>[];
     _loadingLieux = true;
     notifyListeners();
     try {

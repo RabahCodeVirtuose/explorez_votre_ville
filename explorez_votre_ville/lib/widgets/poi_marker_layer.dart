@@ -3,17 +3,26 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../api/api_villes.dart';
+import '../models/lieu_type.dart';
 
 class PoiMarkerLayer extends StatelessWidget {
   final List<LieuApiResult> pois;
   final void Function(LieuApiResult) onTap;
+  final LieuType type;
 
-  const PoiMarkerLayer({super.key, required this.pois, required this.onTap});
+  const PoiMarkerLayer({
+    super.key,
+    required this.pois,
+    required this.onTap,
+    required this.type,
+  });
 
   @override
   Widget build(BuildContext context) {
     const double markerHeight = 40.0;
     const double markerWidth = 150.0;
+    final iconData = LieuTypeHelper.icon(type);
+    final iconColor = LieuTypeHelper.color(type);
 
     return MarkerLayer(
       markers: pois
@@ -27,11 +36,7 @@ class PoiMarkerLayer extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.location_pin,
-                      color: Colors.blue,
-                      size: 32,
-                    ),
+                    Icon(iconData, color: iconColor, size: 26),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(

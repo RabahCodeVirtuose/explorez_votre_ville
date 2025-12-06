@@ -3,12 +3,14 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'poi_marker_layer.dart';
+import '../models/lieu_type.dart';
 
 class MapSection extends StatelessWidget {
   final MapController mapController;
   final LatLng center;
   final List<dynamic> poiMarkers; // LieuApiResult list
   final void Function(dynamic) onPoiTap;
+  final LieuType type;
 
   const MapSection({
     super.key,
@@ -16,6 +18,7 @@ class MapSection extends StatelessWidget {
     required this.center,
     required this.poiMarkers,
     required this.onPoiTap,
+    required this.type,
   });
 
   @override
@@ -50,7 +53,11 @@ class MapSection extends StatelessWidget {
                   ),
                 ],
               ),
-              PoiMarkerLayer(pois: poiMarkers.cast(), onTap: onPoiTap),
+              PoiMarkerLayer(
+                pois: poiMarkers.cast(),
+                onTap: onPoiTap,
+                type: type,
+              ),
             ],
           ),
         ),

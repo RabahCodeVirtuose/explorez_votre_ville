@@ -4,7 +4,6 @@ import 'package:explorez_votre_ville/db/database_helper.dart';
 import 'package:explorez_votre_ville/models/lieu.dart';
 import 'package:sqflite/sqflite.dart';
 
-
 class LieuRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
@@ -53,20 +52,26 @@ class LieuRepository {
   // Supprimer un lieu (les commentaires seront supprimés via ON DELETE CASCADE)
   Future<int> deleteLieu(int id) async {
     final db = await _dbHelper.database;
-    return await db.delete(
+    return await db.delete('lieu', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Récupérer un lieu par nom + ville (pour éviter les doublons)
+  Future<Lieu?> getLieuByNomEtVille(String nom, int villeId) async {
+    final db = await _dbHelper.database;
+    final maps = await db.query(
       'lieu',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'nom = ? AND ville_id = ?',
+      whereArgs: [nom, villeId],
+      limit: 1,
     );
+    if (maps.isEmpty) return null;
+    return Lieu.fromMap(maps.first);
   }
 
   // (Optionnel) Récupérer tous les lieux (debug, tests)
   Future<List<Lieu>> getAllLieux() async {
     final db = await _dbHelper.database;
-    final maps = await db.query(
-      'lieu',
-      orderBy: 'nom ASC',
-    );
+    final maps = await db.query('lieu', orderBy: 'nom ASC');
     return maps.map((m) => Lieu.fromMap(m)).toList();
   }
 }

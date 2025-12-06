@@ -8,7 +8,7 @@ import '../models/lieu_type.dart'; // Types de lieux
 import '../providers/ville_provider.dart'; // Etat ville/meteo
 import '../widgets/carte_meteo.dart'; // Carte meteo
 import '../widgets/error_banner.dart';
-import '../widgets/favorite_cards_bar.dart';
+import '../widgets/favorite_places_section.dart';
 import '../widgets/lieu_type_chips.dart';
 import '../widgets/map_section.dart';
 import '../widgets/search_bar.dart';
@@ -113,14 +113,8 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
   }
 
   void _addPlaceToLocalDatabase(LieuApiResult poi) {
-    // Simple place holder pour le moment, A adapter, passage POI => lieu pour insert dans la BD ?
-    // 1. Convertir l'objet Place en Map JSON
-    final placeData = {
-      'name': poi.name,
-      'latitude': poi.lat,
-      'longitude': poi.lon,
-      'categories': poi.categories,
-    };
+    final provider = context.read<VilleProvider>();
+    provider.ajouterLieuFavori(poi);
   }
 
   String _friendlyError(String raw) {
@@ -141,6 +135,7 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     final provider = context.watch<VilleProvider>(); // Ecoute l'etat
     final meteo = provider.weather; // Donnees meteo
     final poiMarkers = provider.lieux; // Récupère la liste des lieux
+    final favoris = provider.lieuxFavoris;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Explorer une ville')), // Titre
@@ -150,9 +145,10 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
         child: const Icon(Icons.favorite),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(12), // Marges
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SearchBarField(controller: _controller, onSubmitted: _onSearch),
               const SizedBox(height: 12), // Espacement
@@ -205,10 +201,10 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
                 center: _center,
                 poiMarkers: poiMarkers,
                 onPoiTap: (p) => _showPoiDetailsDialog(context, p),
+                type: provider.type,
               ),
               const SizedBox(height: 12),
-              //Expanded(child: _buildLieux(provider)), // Liste des lieux
-              const FavoriteCardsBar(),
+              FavoritePlacesSection(lieux: favoris),
             ],
           ),
         ),
