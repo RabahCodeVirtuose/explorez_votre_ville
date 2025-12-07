@@ -76,15 +76,6 @@ class MeteoCard extends StatelessWidget {
                         children: [
                           Icon(Icons.wb_sunny, size: 18, color: Colors.orange),
 
-                          /*Image.network(
-                            iconUrl,
-                            height: 60, // Définissez une taille appropriée
-                            width: 60,
-                            // Optionnel: Ajouter un placeholder ou une gestion d'erreur
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.cloud_off, size: 60);
-                            },
-                          ),*/
                           SizedBox(width: 6),
                           Text('Météo'),
                         ],
@@ -99,15 +90,6 @@ class MeteoCard extends StatelessWidget {
                         children: [
                           Icon(Icons.opacity, size: 18, color: Colors.blue),
 
-                          /*Image.network(
-                            iconUrl,
-                            height: 60, // Définissez une taille appropriée
-                            width: 60,
-                            // Optionnel: Ajouter un placeholder ou une gestion d'erreur
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.cloud_off, size: 60);
-                            },
-                          ),*/
                           SizedBox(width: 6),
                           Text('Humidité'),
                         ],
@@ -157,15 +139,6 @@ class MeteoCard extends StatelessWidget {
                             children: [
                               Icon(Icons.air_sharp, size: 18),
 
-                              /*Image.network(
-                                iconUrl,
-                                height: 60, // Définissez une taille appropriée
-                                width: 60,
-                                // Optionnel: Ajouter un placeholder ou une gestion d'erreur
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.cloud_off, size: 60);
-                                },
-                              ),*/
                               SizedBox(width: 6),
                               Text('Vent'),
                             ],

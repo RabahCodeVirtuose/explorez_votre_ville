@@ -10,7 +10,6 @@ import '../utils/lieu_type_mapper.dart';
 const String _geoapifyApiKey = '398f2bfe6c7b42f383d68f82511996d8';
 
 /// User-Agent exigé par Nominatim (respect de la politique d’usage).
-/// Tu peux adapter le nom et l’email si besoin.
 const String _nominatimUserAgent =
     'ExploreVille/1.0 (contact: rabah.toubal.etudes@gmail.com)';
 
@@ -160,7 +159,7 @@ class ApiVillesEtLieux {
   static Future<List<LieuApiResult>> fetchLieuxPourVille({
     required String nomVille,
     required LieuType type,
-    int limit = 50,
+    int limit = 15,
   }) async {
     // a) On commence par récupérer la ville et son bbox via Nominatim.
     final ville = await fetchVilleDepuisNominatim(nomVille);

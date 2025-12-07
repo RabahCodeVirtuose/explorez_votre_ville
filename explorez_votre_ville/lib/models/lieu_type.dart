@@ -70,7 +70,7 @@ class LieuTypeHelper {
       case LieuType.cinema:
         return Icons.movie;
       case LieuType.salleConcert:
-        return Icons.church; // proche visuel pour salle de concert
+        return Icons.music_note; // proche visuel pour salle de concert
     }
   }
 

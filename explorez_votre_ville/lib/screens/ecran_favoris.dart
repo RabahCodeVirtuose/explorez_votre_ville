@@ -32,6 +32,8 @@ class _EcranFavorisState extends State<EcranFavoris> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          // snapshot est l’AsyncSnapshot que le FutureBuilder passe au builder. Il contient l’état du Future (connectionState), la donnée (snapshot.data) si elle est
+          // dispo, ou l’erreur (snapshot.error) si le Future a échoué.
           if (snapshot.hasError) {
             return Center(
               child: Padding(
@@ -48,34 +50,47 @@ class _EcranFavorisState extends State<EcranFavoris> {
           if (favoris.isEmpty) {
             return const Center(child: Text('Aucune ville favorite.'));
           }
+          /*context.watch<VilleProvider>() (Provider package) lit le provider et s’abonne aux changements. À chaque notifyListeners() du VilleProvider, le widget est
+  reconstruit. Ici, on récupère l’id de la ville épinglée (pinnedVilleId) et on veut que la liste se mette à jour automatiquement si cet id change. */
           final pinnedId = context.watch<VilleProvider>().pinnedVilleId;
           return ListView.separated(
-            itemCount: favoris.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemCount: favoris.length, // Nombre d’éléments dans la liste
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1), // Séparateur entre lignes
             itemBuilder: (context, index) {
-              final v = favoris[index];
-              final isPinned = pinnedId != null && v.id == pinnedId;
+              final v = favoris[index]; // Ville courante
+              final isPinned =
+                  pinnedId != null &&
+                  v.id == pinnedId; // Est-ce la ville épinglée ?
+
               return ListTile(
-                leading: const Icon(Icons.location_city),
-                title: Text(v.nom),
+                leading: const Icon(Icons.location_city), // Icône à gauche
+                title: Text(v.nom), // Nom de la ville
                 subtitle: Text(
+                  // Affiche pays + lat/lon formatés (ou '-' si absent)
                   '${v.pays ?? ''} '
                   'Lat:${v.latitude?.toStringAsFixed(4) ?? '-'} '
                   'Lon:${v.longitude?.toStringAsFixed(4) ?? '-'}',
                 ),
                 trailing: IconButton(
-                  tooltip: isPinned ? 'Désépingler' : 'Épingler',
+                  tooltip: isPinned ? 'Désépingler' : 'Épingler', // Infobulle
                   icon: Icon(
-                    isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                    color: isPinned ? Colors.orange : null,
+                    isPinned
+                        ? Icons.push_pin
+                        : Icons.push_pin_outlined, // Icône selon statut
+                    color: isPinned
+                        ? Colors.orange
+                        : null, // Couleur si épinglée
                   ),
                   onPressed: () async {
                     final provider = context.read<VilleProvider>();
+                    // Toggle épingle : si déjà épinglée → désépingler, sinon épingler
                     if (isPinned) {
                       await provider.deseEpinglerVille();
                     } else {
                       await provider.epinglerVille(v);
                     }
+                    // Forcer la reconstruction locale pour rafraîchir l’UI
                     setState(() {});
                   },
                 ),

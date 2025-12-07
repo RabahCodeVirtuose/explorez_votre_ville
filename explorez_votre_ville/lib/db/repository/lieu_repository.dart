@@ -67,7 +67,7 @@ class LieuRepository {
     return Lieu.fromMap(maps.first);
   }
 
-  // (Optionnel) Récupérer tous les lieux (debug, tests)
+  //  Récupérer tous les lieux (debug, tests)
   Future<List<Lieu>> getAllLieux() async {
     final db = await _dbHelper.database;
     final maps = await db.query('lieu', orderBy: 'nom ASC');

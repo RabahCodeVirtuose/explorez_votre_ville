@@ -4,11 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-
-
+/// Couche de markers pour afficher les POI sur FlutterMap.
+/// Chaque marker affiche une icône colorée (selon le type) et le nom du lieu.
+/// Un tap sur un marker déclenche le callback [onTap] avec le POI concerné.
 class PoiMarkerLayer extends StatelessWidget {
+  /// Liste des POI (résultats Geoapify/Nominatim encapsulés).
   final List<LieuApiResult> pois;
+
+  /// Callback déclenché au tap sur un marker, reçoit le LieuApiResult.
   final void Function(LieuApiResult) onTap;
+
+  /// Type courant (permet de choisir icône/couleur pour cette série de markers).
   final LieuType type;
 
   const PoiMarkerLayer({
@@ -20,8 +26,11 @@ class PoiMarkerLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dimensions du marker visuel
     const double markerHeight = 40.0;
     const double markerWidth = 150.0;
+
+    // Icône et couleur issues du type (helpers définis dans LieuTypeHelper).
     final iconData = LieuTypeHelper.icon(type);
     final iconColor = LieuTypeHelper.color(type);
 
@@ -33,7 +42,7 @@ class PoiMarkerLayer extends StatelessWidget {
               width: markerWidth,
               height: markerHeight,
               child: GestureDetector(
-                onTap: () => onTap(p),
+                onTap: () => onTap(p), // Propager le POI cliqué au parent
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -48,7 +57,7 @@ class PoiMarkerLayer extends StatelessWidget {
                           fontSize: 12,
                           backgroundColor: Colors.white70,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis, // coupe avec "..."
                       ),
                     ),
                   ],

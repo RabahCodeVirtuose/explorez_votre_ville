@@ -9,9 +9,11 @@ class MapSection extends StatelessWidget {
   final MapController mapController;
   final LatLng center;
   final List<dynamic> poiMarkers; // LieuApiResult list
+  /*final void Function(dynamic) onPoiTap; déclare un callback qui prend un argument de type dynamic (l’élément POI que tu veux passer) et ne retourne rien. Quand la carte détecte un tap sur
+  un marker, elle appelle ce callback en lui passant le POI concerné. Le type dynamic est utilisé ici pour rester souple sur ce que on envoie (par exemple un LieuApiResult ou un modèle
+  similaire) */
   final void Function(dynamic) onPoiTap;
   final LieuType type;
-
   const MapSection({
     super.key,
     required this.mapController,
@@ -33,12 +35,14 @@ class MapSection extends StatelessWidget {
             mapController: mapController,
             options: MapOptions(initialCenter: center, initialZoom: 12),
             children: [
+              // Fond de carte
               TileLayer(
                 urlTemplate:
                     "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
                 subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'com.explorez.votre.ville',
               ),
+              // Marker de la ville au centre
               MarkerLayer(
                 markers: [
                   Marker(
@@ -53,6 +57,7 @@ class MapSection extends StatelessWidget {
                   ),
                 ],
               ),
+              // Markers des POI (colorés/icônés selon le type)
               PoiMarkerLayer(
                 pois: poiMarkers.cast(),
                 onTap: onPoiTap,
