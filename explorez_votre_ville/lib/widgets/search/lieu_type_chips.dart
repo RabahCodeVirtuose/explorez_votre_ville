@@ -1,7 +1,6 @@
+import 'package:explorez_votre_ville/models/lieu_type.dart';
 import 'package:flutter/material.dart';
 
-import '../models/lieu_type.dart';
-import '../utils/lieu_type_mapper.dart';
 
 class LieuTypeChips extends StatelessWidget {
   final LieuType selected;

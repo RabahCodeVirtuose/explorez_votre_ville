@@ -2,7 +2,6 @@
 
 import 'package:explorez_votre_ville/db/database_helper.dart';
 import 'package:explorez_votre_ville/models/commentaire.dart';
-import 'package:sqflite/sqflite.dart';
 
 
 class CommentaireRepository {

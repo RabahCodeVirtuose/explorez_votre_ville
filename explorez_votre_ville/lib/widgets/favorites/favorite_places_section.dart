@@ -1,7 +1,8 @@
+import 'package:explorez_votre_ville/models/lieu.dart';
+import 'package:explorez_votre_ville/models/lieu_type.dart';
 import 'package:flutter/material.dart';
 
-import '../models/lieu.dart';
-import '../models/lieu_type.dart';
+
 
 class FavoritePlacesSection extends StatelessWidget {
   final List<Lieu> lieux;

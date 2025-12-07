@@ -2,7 +2,6 @@
 
 import 'package:explorez_votre_ville/db/database_helper.dart';
 import 'package:explorez_votre_ville/models/lieu.dart';
-import 'package:sqflite/sqflite.dart';
 
 class LieuRepository {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;

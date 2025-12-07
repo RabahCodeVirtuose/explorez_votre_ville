@@ -1,17 +1,16 @@
 import 'package:explorez_votre_ville/api/api_villes.dart';
+import 'package:explorez_votre_ville/widgets/favorites/favorite_places_section.dart';
+import 'package:explorez_votre_ville/widgets/info/carte_meteo.dart';
+import 'package:explorez_votre_ville/widgets/map/map_section.dart';
+import 'package:explorez_votre_ville/widgets/search/place_search_section.dart';
 import 'package:flutter/material.dart'; // Material
 import 'package:flutter_map/flutter_map.dart'; // MapController
 import 'package:latlong2/latlong.dart'; // Coordonnees
 import 'package:provider/provider.dart'; // Provider
 
-import '../models/lieu_type.dart'; // Types de lieux
+// Types de lieux
 import '../providers/ville_provider.dart'; // Etat ville/meteo
-import '../widgets/carte_meteo.dart'; // Carte meteo
-import '../widgets/error_banner.dart';
-import '../widgets/favorite_places_section.dart';
-import '../widgets/lieu_type_chips.dart';
-import '../widgets/map_section.dart';
-import '../widgets/search_bar.dart';
+import '../widgets/weather_section.dart';
 
 class EcranListeVilles extends StatefulWidget {
   const EcranListeVilles({super.key});
@@ -48,28 +47,6 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     final centre = provider.mapCenter; // Centre calcule
     setState(() => _center = centre); // Met a jour centre local
     _mapController.move(centre, 12); // Deplace la carte
-  }
-
-  Widget _buildLieux(VilleProvider provider) {
-    // Liste des lieux pour le type courant
-    if (provider.loadingLieux) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (provider.lieux.isEmpty) {
-      return const Center(child: Text('Aucun lieu pour ce type.'));
-    }
-    return ListView.separated(
-      itemCount: provider.lieux.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final lieu = provider.lieux[index];
-        return ListTile(
-          title: Text(lieu.name.isEmpty ? '(Sans nom)' : lieu.name),
-          subtitle: Text(lieu.formattedAddress),
-          leading: const Icon(Icons.place),
-        );
-      },
-    );
   }
 
   void _showPoiDetailsDialog(BuildContext context, LieuApiResult poi) {
@@ -161,51 +138,33 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SearchBarField(controller: _controller, onSubmitted: _onSearch),
-              const SizedBox(height: 12), // Espacement
-              if (provider.loading)
-                const LinearProgressIndicator(), // Barre chargement
-              if (provider.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8), // Marge haute
-                  child: ErrorBanner(message: _friendlyError(provider.error!)),
-                ),
+              PlaceSearchSection(
+                controller: _controller,
+                onSubmit: _onSearch,
+                loading: provider.loading,
+                error: provider.error != null
+                    ? _friendlyError(provider.error!)
+                    : null,
+                selectedType: provider.type,
+                onTypeChanged: provider.changerType,
+              ),
               if (meteo != null) ...[
-                const SizedBox(height: 12), // Espacement
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: MeteoCard(
-                        temperature: meteo.temperature,
-                        windSpeed: meteo.windSpeed,
-                        temperatureMin: meteo.temperatureMin,
-                        temperatureMax: meteo.temperatureMax,
-                        humidity: meteo.humidity,
-                        cityName: meteo.cityName,
-                        description: meteo.description,
-                        icon: meteo.icon,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Ajouter aux favoris',
-                      icon: Icon(
-                        provider.isFavoriActuel
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: provider.isFavoriActuel ? Colors.red : null,
-                      ),
-                      onPressed: () => provider.basculerFavoriActuel(),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                WeatherSection(
+                  isFavori: provider.isFavoriActuel,
+                  onToggleFavori: provider.basculerFavoriActuel,
+                  meteoCard: MeteoCard(
+                    temperature: meteo.temperature,
+                    windSpeed: meteo.windSpeed,
+                    temperatureMin: meteo.temperatureMin,
+                    temperatureMax: meteo.temperatureMax,
+                    humidity: meteo.humidity,
+                    cityName: meteo.cityName,
+                    description: meteo.description,
+                    icon: meteo.icon,
+                  ),
                 ),
               ],
-              const SizedBox(height: 12), // Espacement
-              LieuTypeChips(
-                selected: provider.type,
-                onSelected: provider.changerType,
-              ),
               const SizedBox(height: 12), // Espacement
               MapSection(
                 mapController: _mapController,
