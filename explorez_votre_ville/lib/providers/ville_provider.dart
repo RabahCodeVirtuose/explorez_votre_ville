@@ -11,26 +11,39 @@ import '../models/lieu_type.dart';
 import '../models/weather_data.dart';
 import '../models/ville.dart';
 
-/// Provider qui expose l'etat ville/meteo et les favoris (SQLite).
+/// Provider central qui pilote :
+/// - la ville et la meteo courantes,
+/// - le chargement des lieux (POI) selon un type,
+/// - la persistance des favoris (villes + lieux) en base SQLite,
+/// - la ville « epinglee » stockee en SharedPreferences pour l'ouverture.
 class VilleProvider with ChangeNotifier {
+  // Centre par defaut (Paris) utilise quand aucune ville n'est encore chargee.
   final LatLng _defaultCenter = const LatLng(48.8566, 2.3522);
 
-  WeatherData? _weather;
-  VilleApiResult? _ville;
+  // Etat courant issu des APIs.
+  WeatherData? _weather; // Meteo complete (OpenWeather)
+  VilleApiResult? _ville; // Infos ville (Nominatim)
+
+  // Meta-etat de chargement.
   bool _loading = false;
   String? _error;
   String? _lastQuery;
 
+  // Lieux (POI) affiches pour le type selectionne.
   List<LieuApiResult> _lieux = <LieuApiResult>[];
   LieuType _type = LieuType.parc;
   bool _loadingLieux = false;
-  bool _isFavoriActuel = false;
-  List<Lieu> _lieuxFavoris = <Lieu>[];
-  int? _pinnedVilleId;
 
+  // Gestion des favoris.
+  bool _isFavoriActuel = false; // Statut favori de la ville courante
+  List<Lieu> _lieuxFavoris = <Lieu>[]; // Lieux favoris (en base) pour la ville courante
+  int? _pinnedVilleId; // Identifiant de la ville epinglee (SharedPreferences)
+
+  // Repositories d'acces a la base locale.
   final VilleRepository _villeRepo = VilleRepository();
   final LieuRepository _lieuRepo = LieuRepository();
 
+  // Getters exposes aux widgets.
   WeatherData? get weather => _weather;
   VilleApiResult? get ville => _ville;
   bool get loading => _loading;
@@ -42,12 +55,15 @@ class VilleProvider with ChangeNotifier {
   List<Lieu> get lieuxFavoris => _lieuxFavoris;
   int? get pinnedVilleId => _pinnedVilleId;
 
+  /// Coordonnees a utiliser pour centrer la carte
+  /// (meteo > ville > valeur par defaut).
   LatLng get mapCenter {
     if (_weather != null) return _weather!.coordonnees;
     if (_ville != null) return LatLng(_ville!.lat, _ville!.lon);
     return _defaultCenter;
   }
 
+  /// Remet tout l'etat a zero (utilise pour reinitialiser la page).
   void reset() {
     _weather = null;
     _ville = null;
@@ -63,6 +79,7 @@ class VilleProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Recherche en base locale une ville par son nom (casse ignoree).
   Future<Ville?> _trouverVilleParNom(String nom) async {
     final list = await _villeRepo.searchVillesByName(nom);
     for (final v in list) {
@@ -73,6 +90,7 @@ class VilleProvider with ChangeNotifier {
     return null;
   }
 
+  /// Aligne le statut favori de la ville courante sur la base locale.
   Future<void> _synchroniserFavoriActuel() async {
     if (_weather == null) {
       _isFavoriActuel = false;
@@ -83,13 +101,16 @@ class VilleProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Recupere la ville courante en base ou l'insere si absente.
+  /// Conserve le statut favori courant.
   Future<Ville?> _getOrInsertVilleCourante() async {
     if (_weather == null) return null;
-    // Cherche en base
+
+    // 1. Cherche si la ville existe deja.
     final existing = await _trouverVilleParNom(_weather!.cityName);
     if (existing != null) return existing;
 
-    // Insère si absente (en conservant le statut favori courant)
+    // 2. Sinon, cree et insere une nouvelle entree.
     final nouvelle = Ville(
       nom: _weather!.cityName,
       latitude: _weather?.coordonnees.latitude,
@@ -100,11 +121,13 @@ class VilleProvider with ChangeNotifier {
     return nouvelle.copyWith(id: id);
   }
 
+  /// Charge les lieux favoris en base pour une ville donnee.
   Future<void> _chargerLieuxFavorisPourVille(Ville ville) async {
     _lieuxFavoris = await _lieuRepo.getLieuxByVilleId(ville.id!);
     notifyListeners();
   }
 
+  /// Charge les lieux favoris pour la ville courante, ou vide la liste.
   Future<void> _chargerFavorisVilleCourante() async {
     if (_weather == null) {
       _lieuxFavoris = <Lieu>[];
@@ -120,12 +143,14 @@ class VilleProvider with ChangeNotifier {
     }
   }
 
+  /// Lit en SharedPreferences l'id de la ville epinglee (si existante).
   Future<void> chargerPinnedDepuisPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     _pinnedVilleId = prefs.getInt('pinned_ville_id');
     notifyListeners();
   }
 
+  /// Epingler une ville (enregistre l'id dans SharedPreferences).
   Future<void> epinglerVille(Ville ville) async {
     if (ville.id == null) return;
     final prefs = await SharedPreferences.getInstance();
@@ -134,6 +159,7 @@ class VilleProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Supprime l'epingle courante.
   Future<void> deseEpinglerVille() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('pinned_ville_id');
@@ -141,6 +167,7 @@ class VilleProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Si une ville est epinglee, relance la recherche pour l'afficher.
   Future<void> afficherVilleEpinglee() async {
     if (_pinnedVilleId == null) return;
     final ville = await _villeRepo.getVilleById(_pinnedVilleId!);
@@ -149,6 +176,7 @@ class VilleProvider with ChangeNotifier {
     }
   }
 
+  /// Marque une ville comme favorite en base et dans l'etat.
   Future<void> marquerFavori(Ville ville) async {
     if (ville.id == null) {
       await _villeRepo.insertVille(ville.copyWith(isFavorie: true));
@@ -159,6 +187,7 @@ class VilleProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Retire le statut favori pour la ville passee.
   Future<void> retirerFavori(Ville ville) async {
     if (ville.id != null) {
       await _villeRepo.updateVille(ville.copyWith(isFavorie: false));
@@ -167,10 +196,13 @@ class VilleProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Renvoie toutes les villes favorites stockees en base locale.
   Future<List<Ville>> chargerFavoris() async {
     return _villeRepo.getVillesFavorites();
   }
 
+  /// Appel principal : cherche une ville, sa meteo, puis charge les lieux,
+  /// synchronise le statut favori et les lieux favoris.
   Future<void> chercherVille(String nomVille) async {
     final query = nomVille.trim();
     if (query.isEmpty) {
@@ -203,11 +235,13 @@ class VilleProvider with ChangeNotifier {
     }
   }
 
+  /// Change le type de lieu a afficher et recharge les POI.
   Future<void> changerType(LieuType type) async {
     _type = type;
     await _chargerLieux(type: type);
   }
 
+  /// Ajoute ou retire la ville courante des favoris, puis resynchronise l'etat.
   Future<void> basculerFavoriActuel() async {
     if (_weather == null) return;
     final nom = _weather!.cityName;
@@ -232,14 +266,15 @@ class VilleProvider with ChangeNotifier {
     await _synchroniserFavoriActuel();
   }
 
+  /// Enregistre un lieu favori pour la ville courante (nom+ville non dupliques).
   Future<void> ajouterLieuFavori(LieuApiResult poi) async {
     if (_weather == null) return;
 
-    // S'assure que la ville courante est présente en base
+    // S'assure que la ville courante est presente en base.
     final villeCourante = await _getOrInsertVilleCourante();
     if (villeCourante == null || villeCourante.id == null) return;
 
-    // Evite les doublons (nom + ville)
+    // Evite les doublons (nom + ville).
     final deja = await _lieuRepo.getLieuByNomEtVille(
       poi.name,
       villeCourante.id!,
@@ -261,6 +296,7 @@ class VilleProvider with ChangeNotifier {
     await _chargerLieuxFavorisPourVille(villeCourante);
   }
 
+  /// Charge les lieux (POI) pour le type demande et met a jour l'etat UI.
   Future<void> _chargerLieux({required LieuType type}) async {
     if (_lastQuery == null || _lastQuery!.isEmpty) {
       _lieux = <LieuApiResult>[];
@@ -268,7 +304,8 @@ class VilleProvider with ChangeNotifier {
       return;
     }
 
-    // Vider la liste actuelle pour éviter d'afficher les anciens marqueurs
+    // Vider la liste actuelle pour eviter d'afficher les anciens marqueurs
+    // pendant le chargement du nouveau type.
     _lieux = <LieuApiResult>[];
     _loadingLieux = true;
     notifyListeners();
