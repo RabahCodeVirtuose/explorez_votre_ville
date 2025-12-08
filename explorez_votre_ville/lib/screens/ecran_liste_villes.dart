@@ -1,6 +1,7 @@
 import 'package:explorez_votre_ville/api/api_villes.dart';
 import 'package:explorez_votre_ville/widgets/favorites/favorite_places_section.dart';
 import 'package:explorez_votre_ville/widgets/info/carte_meteo.dart';
+import 'package:explorez_votre_ville/widgets/dialogs/poi_details_dialog.dart';
 import 'package:explorez_votre_ville/widgets/map/map_section.dart';
 import 'package:explorez_votre_ville/widgets/search/place_search_section.dart';
 import 'package:flutter/material.dart'; // Material
@@ -52,43 +53,15 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
   void _showPoiDetailsDialog(BuildContext context, LieuApiResult poi) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(poi.name), // Le nom du lieu
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text('Catégorie : ${poi.categories.first}'),
-                Text(
-                  'Coordonnées : ${poi.lat.toStringAsFixed(4)}, ${poi.lon.toStringAsFixed(4)}',
-                ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Fermer'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add_location_alt),
-              label: const Text('Ajouter à mes lieux favoris'),
-              onPressed: () {
-                // ACTION D'AJOUT : Persistance des données
-                _addPlaceToLocalDatabase(poi);
-                Navigator.of(dialogContext).pop();
-
-                // Optionnel : Afficher un SnackBar de confirmation
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('${poi.name} ajouté !')));
-              },
-            ),
-          ],
-        );
-      },
+      builder: (BuildContext dialogContext) => PoiDetailsDialog(
+        poi: poi,
+        onAdd: () {
+          _addPlaceToLocalDatabase(poi);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${poi.name} ajouté !')),
+          );
+        },
+      ),
     );
   }
 
