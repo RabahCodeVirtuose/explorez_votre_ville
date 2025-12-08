@@ -6,6 +6,12 @@ import 'package:latlong2/latlong.dart';
 import 'poi_marker_layer.dart';
 
 class MapSection extends StatelessWidget {
+  // Palette alignée sur le reste de l'UI
+  static const Color _deepGreen = Color(0xFF18534F);
+  static const Color _teal = Color(0xFF226D68);
+  static const Color _mint = Color(0xFFECF8F6);
+  static const Color _amber = Color(0xFFFEEAA1);
+
   final MapController mapController;
   final LatLng center;
   final List<dynamic> poiMarkers; // LieuApiResult list
@@ -27,18 +33,24 @@ class MapSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 220,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+      child: Material(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: _amber, width: 1.5),
+        ),
+        elevation: 4,
+        clipBehavior: Clip.antiAlias,
         child: Container(
-          color: const Color(0xFFF6F1E9),
+          color: _mint,
           child: FlutterMap(
             mapController: mapController,
             options: MapOptions(initialCenter: center, initialZoom: 12),
             children: [
               // Fond de carte
               TileLayer(
+                // Palette plus chaleureuse via le style "voyager" de Carto
                 urlTemplate:
-                    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
                 subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'com.explorez.votre.ville',
               ),
@@ -47,12 +59,19 @@ class MapSection extends StatelessWidget {
                 markers: [
                   Marker(
                     point: center,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(
-                      Icons.location_on,
-                      color: Colors.red,
-                      size: 36,
+                    width: 44,
+                    height: 44,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _amber.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _deepGreen, width: 1.0),
+                      ),
+                      child: Icon(
+                        Icons.location_on,
+                        color: _deepGreen,
+                        size: 30,
+                      ),
                     ),
                   ),
                 ],

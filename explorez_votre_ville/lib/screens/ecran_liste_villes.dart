@@ -13,6 +13,12 @@ import 'package:provider/provider.dart'; // Provider
 import '../providers/ville_provider.dart'; // Etat ville/meteo
 import 'package:explorez_votre_ville/widgets/info/weather_section.dart';
 
+// Palette commune
+const Color _deepGreen = Color(0xFF18534F);
+const Color _teal = Color(0xFF226D68);
+const Color _amber = Color(0xFFFEEAA1);
+const Color _mint = Color(0xFFECF8F6);
+
 class EcranListeVilles extends StatefulWidget {
   const EcranListeVilles({super.key});
 
@@ -57,9 +63,9 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
         poi: poi,
         onAdd: () {
           _addPlaceToLocalDatabase(poi);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${poi.name} ajouté !')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${poi.name} ajouté !')));
         },
       ),
     );
@@ -99,56 +105,97 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Explorer une ville')), // Titre
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Mes favoris',
-        onPressed: () => Navigator.pushNamed(context, '/favoris'),
-        child: const Icon(Icons.favorite),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(12), // Marges
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PlaceSearchSection(
-                controller: _controller,
-                onSubmit: _onSearch,
-                loading: provider.loading,
-                error: provider.error != null
-                    ? _friendlyError(provider.error!)
-                    : null,
-                selectedType: provider.type,
-                onTypeChanged: provider.changerType,
-              ),
-              if (meteo != null) ...[
-                const SizedBox(height: 12),
-                WeatherSection(
-                  isFavori: provider.isFavoriActuel,
-                  onToggleFavori: provider.basculerFavoriActuel,
-                  meteoCard: MeteoCard(
-                    temperature: meteo.temperature,
-                    windSpeed: meteo.windSpeed,
-                    temperatureMin: meteo.temperatureMin,
-                    temperatureMax: meteo.temperatureMax,
-                    humidity: meteo.humidity,
-                    cityName: meteo.cityName,
-                    description: meteo.description,
-                    icon: meteo.icon,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _mint),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Explorer une ville', style: TextStyle(color: _mint)),
+        backgroundColor: _teal,
+        actions: [
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: _mint),
+            onPressed: () => Navigator.pushNamed(context, '/favoris'),
+            icon: const Icon(Icons.favorite),
+            label: const Text('Mes villes favorites'),
+          ),
+        ],
+      ), // Titre + action favoris
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_teal, _amber],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // ConstrainedBox pour forcer un minimum de hauteur et éviter
+              // le "trou" blanc quand il y a peu de contenu.
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12), // Marges
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        PlaceSearchSection(
+                          controller: _controller,
+                          onSubmit: _onSearch,
+                          loading: provider.loading,
+                          error: provider.error != null
+                              ? _friendlyError(provider.error!)
+                              : null,
+                          selectedType: provider.type,
+                          onTypeChanged: (type) async {
+                            await provider.changerType(type);
+                            final centre = provider.mapCenter;
+                            setState(() => _center = centre);
+                            _mapController.move(centre, 12);
+                          },
+                        ),
+                        if (meteo != null) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 262, // un peu plus haut pour éviter l'overflow
+                            child: WeatherSection(
+                              isFavori: provider.isFavoriActuel,
+                              onToggleFavori: provider.basculerFavoriActuel,
+                              meteoCard: MeteoCard(
+                                temperature: meteo.temperature,
+                                windSpeed: meteo.windSpeed,
+                                temperatureMin: meteo.temperatureMin,
+                                temperatureMax: meteo.temperatureMax,
+                                humidity: meteo.humidity,
+                                cityName: meteo.cityName,
+                                description: meteo.description,
+                                icon: meteo.icon,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8), // Espacement
+                        SizedBox(
+                          height: 320, // carte plus haute que la section météo
+                          child: MapSection(
+                            mapController: _mapController,
+                            center: _center,
+                            poiMarkers: poiMarkers,
+                            onPoiTap: (p) => _showPoiDetailsDialog(context, p),
+                            type: provider.type,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        FavoritePlacesSection(lieux: favoris),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-              const SizedBox(height: 12), // Espacement
-              MapSection(
-                mapController: _mapController,
-                center: _center,
-                poiMarkers: poiMarkers,
-                onPoiTap: (p) => _showPoiDetailsDialog(context, p),
-                type: provider.type,
-              ),
-              const SizedBox(height: 12),
-              FavoritePlacesSection(lieux: favoris),
-            ],
+              );
+            },
           ),
         ),
       ),

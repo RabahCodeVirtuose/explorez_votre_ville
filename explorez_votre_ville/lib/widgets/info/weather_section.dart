@@ -24,18 +24,18 @@ class WeatherSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: _deepGreen,
-        border: Border.all(color: _amber, width: 1.5),
+        color: _mint,
+        border: Border.all(color: _deepGreen, width: 1.5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: meteoCard),
-          const SizedBox(width: 8),
+          const SizedBox(width: 3),
           // Bouton favori avec marge tout autour
           Padding(
-            padding: const EdgeInsets.all(6.0),
+            padding: const EdgeInsets.all(4.0),
             child: Container(
               decoration: BoxDecoration(
                 color: isFavori ? _amber.withOpacity(0.8) : _mint,
