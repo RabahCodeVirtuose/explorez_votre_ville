@@ -161,12 +161,16 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
                           const SizedBox(height: 8),
                           SizedBox(
                             height: 262, // un peu plus haut pour éviter l'overflow
-                            child: WeatherSection(
-                              isFavori: provider.isFavoriActuel,
-                              onToggleFavori: provider.basculerFavoriActuel,
-                              meteoCard: MeteoCard(
-                                temperature: meteo.temperature,
-                                windSpeed: meteo.windSpeed,
+                  child: WeatherSection(
+                    isFavori: provider.isFavoriActuel,
+                    isVisitee: provider.isVisiteeActuelle,
+                    isExploree: provider.isExploreeActuelle,
+                    onToggleFavori: provider.basculerFavoriActuel,
+                    onToggleVisitee: provider.basculerVisiteeActuelle,
+                    onToggleExploree: provider.basculerExploreeActuelle,
+                    meteoCard: MeteoCard(
+                      temperature: meteo.temperature,
+                      windSpeed: meteo.windSpeed,
                                 temperatureMin: meteo.temperatureMin,
                                 temperatureMax: meteo.temperatureMax,
                                 humidity: meteo.humidity,

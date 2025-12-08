@@ -72,27 +72,63 @@ class _EcranFavorisState extends State<EcranFavoris> {
                   'Lat:${v.latitude?.toStringAsFixed(4) ?? '-'} '
                   'Lon:${v.longitude?.toStringAsFixed(4) ?? '-'}',
                 ),
-                trailing: IconButton(
-                  tooltip: isPinned ? 'Désépingler' : 'Épingler', // Infobulle
-                  icon: Icon(
-                    isPinned
-                        ? Icons.push_pin
-                        : Icons.push_pin_outlined, // Icône selon statut
-                    color: isPinned
-                        ? Colors.orange
-                        : null, // Couleur si épinglée
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: isPinned ? 'Désépingler' : 'Épingler', // Infobulle
+                      icon: Icon(
+                        isPinned
+                            ? Icons.push_pin
+                            : Icons.push_pin_outlined, // Icône selon statut
+                        color: isPinned
+                            ? Colors.orange
+                            : null, // Couleur si épinglée
+                      ),
+                      onPressed: () async {
+                        final provider = context.read<VilleProvider>();
+                        // Toggle épingle : si déjà épinglée → désépingler, sinon épingler
+                        if (isPinned) {
+                          await provider.deseEpinglerVille();
+                        } else {
+                          await provider.epinglerVille(v);
+                        }
+                        setState(() {});
+                      },
+                    ),
+                  IconButton(
+                    tooltip: 'Supprimer',
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: () async {
+                      final provider = context.read<VilleProvider>();
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Supprimer cette ville ?'),
+                            content: Text(
+                                'Voulez-vous retirer "${v.nom}" des favoris ?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Annuler'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Supprimer'),
+                              ),
+                            ],
+                        ),
+                      );
+                      if (confirm == true && v.id != null) {
+                        await provider.supprimerVille(v.id!);
+                        setState(() {
+                          // Rafraîchir la liste des favoris après suppression
+                          _favorisFuture = provider.chargerFavoris();
+                        });
+                      }
+                    },
                   ),
-                  onPressed: () async {
-                    final provider = context.read<VilleProvider>();
-                    // Toggle épingle : si déjà épinglée → désépingler, sinon épingler
-                    if (isPinned) {
-                      await provider.deseEpinglerVille();
-                    } else {
-                      await provider.epinglerVille(v);
-                    }
-                    // Forcer la reconstruction locale pour rafraîchir l’UI
-                    setState(() {});
-                  },
+                  ],
                 ),
               );
             },

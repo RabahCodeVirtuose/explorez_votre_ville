@@ -36,7 +36,10 @@ class VilleProvider with ChangeNotifier {
 
   // Gestion des favoris.
   bool _isFavoriActuel = false; // Statut favori de la ville courante
-  List<Lieu> _lieuxFavoris = <Lieu>[]; // Lieux favoris (en base) pour la ville courante
+  bool _isVisiteeActuelle = false; // Ville visitée
+  bool _isExploreeActuelle = false; // Ville explorée
+  List<Lieu> _lieuxFavoris =
+      <Lieu>[]; // Lieux favoris (en base) pour la ville courante
   int? _pinnedVilleId; // Identifiant de la ville epinglee (SharedPreferences)
 
   // Repositories d'acces a la base locale.
@@ -52,6 +55,8 @@ class VilleProvider with ChangeNotifier {
   LieuType get type => _type;
   bool get loadingLieux => _loadingLieux;
   bool get isFavoriActuel => _isFavoriActuel;
+  bool get isVisiteeActuelle => _isVisiteeActuelle;
+  bool get isExploreeActuelle => _isExploreeActuelle;
   List<Lieu> get lieuxFavoris => _lieuxFavoris;
   int? get pinnedVilleId => _pinnedVilleId;
 
@@ -74,6 +79,8 @@ class VilleProvider with ChangeNotifier {
     _type = LieuType.parc;
     _loadingLieux = false;
     _isFavoriActuel = false;
+    _isVisiteeActuelle = false;
+    _isExploreeActuelle = false;
     _lieuxFavoris = <Lieu>[];
     _pinnedVilleId = null;
     notifyListeners();
@@ -94,10 +101,14 @@ class VilleProvider with ChangeNotifier {
   Future<void> _synchroniserFavoriActuel() async {
     if (_weather == null) {
       _isFavoriActuel = false;
+      _isVisiteeActuelle = false;
+      _isExploreeActuelle = false;
       return;
     }
     final existing = await _trouverVilleParNom(_weather!.cityName);
     _isFavoriActuel = existing?.isFavorie == true;
+    _isVisiteeActuelle = existing?.isVisitee == true;
+    _isExploreeActuelle = existing?.isExploree == true;
     notifyListeners();
   }
 
@@ -116,6 +127,8 @@ class VilleProvider with ChangeNotifier {
       latitude: _weather?.coordonnees.latitude,
       longitude: _weather?.coordonnees.longitude,
       isFavorie: _isFavoriActuel,
+      isVisitee: _isVisiteeActuelle,
+      isExploree: _isExploreeActuelle,
     );
     final id = await _villeRepo.insertVille(nouvelle);
     return nouvelle.copyWith(id: id);
@@ -201,6 +214,30 @@ class VilleProvider with ChangeNotifier {
     return _villeRepo.getVillesFavorites();
   }
 
+  /// Supprime une ville en base (et désépingle si c'était celle en cours),
+  /// et nettoie les états locaux si la ville courante est concernée.
+  Future<void> supprimerVille(int id) async {
+    // On récupère l'id de la ville courante avant suppression
+    Ville? current;
+    if (_weather != null) {
+      current = await _trouverVilleParNom(_weather!.cityName);
+    }
+
+    await _villeRepo.deleteVille(id);
+
+    // Si c'était la ville épinglée, on la désépingle.
+    if (_pinnedVilleId == id) {
+      _pinnedVilleId = null;
+    }
+
+    // Si c'était la ville actuellement affichée, on met à jour les flags locaux.
+    if (current?.id == id) {
+      reset();
+    }
+
+    notifyListeners();
+  }
+
   /// Appel principal : cherche une ville, sa meteo, puis charge les lieux,
   /// synchronise le statut favori et les lieux favoris.
   Future<void> chercherVille(String nomVille) async {
@@ -254,6 +291,8 @@ class VilleProvider with ChangeNotifier {
         latitude: _weather?.coordonnees.latitude,
         longitude: _weather?.coordonnees.longitude,
         isFavorie: true,
+        isVisitee: _isVisiteeActuelle,
+        isExploree: _isExploreeActuelle,
       );
       await marquerFavori(nouvelle);
     } else {
@@ -264,6 +303,60 @@ class VilleProvider with ChangeNotifier {
       }
     }
     await _synchroniserFavoriActuel();
+  }
+
+  /// Bascule le statut "visitee" sur la ville courante.
+  Future<void> basculerVisiteeActuelle() async {
+    if (_weather == null) return;
+    final nom = _weather!.cityName;
+    final existing = await _trouverVilleParNom(nom);
+
+    if (existing == null) {
+      final nouvelle = Ville(
+        nom: nom,
+        pays: null,
+        latitude: _weather?.coordonnees.latitude,
+        longitude: _weather?.coordonnees.longitude,
+        isFavorie: _isFavoriActuel,
+        isVisitee: true,
+        isExploree: _isExploreeActuelle,
+      );
+      final id = await _villeRepo.insertVille(nouvelle);
+      _isVisiteeActuelle = true;
+      await _chargerFavorisVilleCourante();
+    } else {
+      final updated = existing.copyWith(isVisitee: !existing.isVisitee);
+      await _villeRepo.updateVille(updated);
+      _isVisiteeActuelle = updated.isVisitee;
+    }
+    notifyListeners();
+  }
+
+  /// Bascule le statut "explorée" sur la ville courante.
+  Future<void> basculerExploreeActuelle() async {
+    if (_weather == null) return;
+    final nom = _weather!.cityName;
+    final existing = await _trouverVilleParNom(nom);
+
+    if (existing == null) {
+      final nouvelle = Ville(
+        nom: nom,
+        pays: null,
+        latitude: _weather?.coordonnees.latitude,
+        longitude: _weather?.coordonnees.longitude,
+        isFavorie: _isFavoriActuel,
+        isVisitee: _isVisiteeActuelle,
+        isExploree: true,
+      );
+      final id = await _villeRepo.insertVille(nouvelle);
+      _isExploreeActuelle = true;
+      await _chargerFavorisVilleCourante();
+    } else {
+      final updated = existing.copyWith(isExploree: !existing.isExploree);
+      await _villeRepo.updateVille(updated);
+      _isExploreeActuelle = updated.isExploree;
+    }
+    notifyListeners();
   }
 
   /// Enregistre un lieu favori pour la ville courante (nom+ville non dupliques).
