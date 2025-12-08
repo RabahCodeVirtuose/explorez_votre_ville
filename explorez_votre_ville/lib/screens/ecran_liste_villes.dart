@@ -11,7 +11,7 @@ import 'package:provider/provider.dart'; // Provider
 
 // Types de lieux
 import '../providers/ville_provider.dart'; // Etat ville/meteo
-import '../widgets/weather_section.dart';
+import 'package:explorez_votre_ville/widgets/info/weather_section.dart';
 
 class EcranListeVilles extends StatefulWidget {
   const EcranListeVilles({super.key});

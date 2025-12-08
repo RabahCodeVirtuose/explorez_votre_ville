@@ -6,6 +6,7 @@ import "screens/ecran_liste_villes.dart";
 import "screens/ecran_favoris.dart";
 
 void main() {
+  // Injection du provider global (ville/météo/favoris) à la racine.
   runApp(
     ChangeNotifierProvider(
       create: (_) => VilleProvider(),
@@ -21,9 +22,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
       title: 'Explorez votre ville',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.blue, // couleur seed globale
+      ),
+      // Définition des routes principales de l'application.
       routes: {
         '/': (_) => const EcranAccueil(),
         '/home': (_) => const EcranListeVilles(),
