@@ -1,30 +1,59 @@
-import 'package:explorez_votre_ville/db/repository/lieu_repository.dart';
-import 'package:explorez_votre_ville/models/lieu.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-/// Affiche le détail d'un lieu favori (nom, type, adresse, coordonnées).
+import '../models/lieu.dart';
+import '../providers/ville_provider.dart';
+import '../widgets/ecran_detail/comments_section.dart';
+import '../widgets/ecran_detail/lieu_header.dart';
+
+/// Détail d'un lieu favori (nom, type, adresse, coordonnées + commentaires).
 /// Attend un `int` (id du lieu) passé via `Navigator.pushNamed(..., arguments: id)`.
-class EcranDetailLieu extends StatelessWidget {
+class EcranDetailLieu extends StatefulWidget {
   final int? lieuId;
   const EcranDetailLieu({super.key, required this.lieuId});
 
   @override
+  State<EcranDetailLieu> createState() => _EcranDetailLieuState();
+}
+
+class _EcranDetailLieuState extends State<EcranDetailLieu> {
+  // Pas de contrôleurs ici : l'ajout/édition de commentaires
+  // se fait uniquement dans l'écran d’édition pour éviter les doublons.
+
+  @override
   Widget build(BuildContext context) {
     // Si aucun id n'est fourni, on affiche une erreur simple.
-    if (lieuId == null) {
+    if (widget.lieuId == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Détail du lieu')),
-        body: const Center(
-          child: Text('Aucun identifiant de lieu fourni.'),
-        ),
+        body: const Center(child: Text('Aucun identifiant de lieu fourni.')),
       );
     }
 
-    final repo = LieuRepository();
+    final lieuProvider = context.read<VilleProvider>();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Détail du lieu')),
+      appBar: AppBar(
+        title: const Text('Détail du lieu'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Modifier le lieu',
+            onPressed: () async {
+              final result = await Navigator.pushNamed(
+                context,
+                '/edit_lieu',
+                arguments: widget.lieuId,
+              );
+              if (result == true && mounted) {
+                setState(() {});
+              }
+            },
+          ),
+        ],
+      ),
       body: FutureBuilder<Lieu?>(
-        future: repo.getLieuById(lieuId!),
+        future: lieuProvider.getLieuById(widget.lieuId!),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -51,34 +80,14 @@ class EcranDetailLieu extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  lieu.nom,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.category, size: 18),
-                    const SizedBox(width: 6),
-                    Text(lieu.type.name),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (lieu.description != null && lieu.description!.isNotEmpty)
-                  Text(lieu.description!),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.pin_drop, size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Lat: ${lieu.latitude?.toStringAsFixed(4) ?? '-'} / Lon: ${lieu.longitude?.toStringAsFixed(4) ?? '-'}',
-                    ),
-                  ],
-                ),
+                // En-tête du lieu (nom/type/coordonnées)
+                LieuHeader(lieu: lieu),
+
+                
+                const Divider(height: 24),
+
+                // Liste des commentaires (lecture seule)
+                CommentsSection(lieuId: lieu.id!),
               ],
             ),
           );

@@ -31,6 +31,13 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
     _localLieux = List<Lieu>.from(widget.lieux);
   }
 
+/*didUpdateWidget est appelé quand le parent reconstruit ce widget avec de nouvelles propriétés. Ici :
+
+  - oldWidget.lieux est l’ancienne liste passée.
+  - widget.lieux est la nouvelle liste passée.
+  - Si elles diffèrent, on met à jour la copie locale _localLieux (utilisée pour l’affichage/suppression optimiste).
+
+  En résumé, ça synchronise l’état interne _localLieux avec les nouvelles données du parent, pour ne pas rester sur une ancienne liste. */
   @override
   void didUpdateWidget(covariant FavoritePlacesSection oldWidget) {
     super.didUpdateWidget(oldWidget);

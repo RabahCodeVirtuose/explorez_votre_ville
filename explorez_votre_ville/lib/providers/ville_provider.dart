@@ -272,6 +272,11 @@ class VilleProvider with ChangeNotifier {
     }
   }
 
+  /// Récupère un lieu par son id (accès indirect au repo).
+  Future<Lieu?> getLieuById(int id) async {
+    return _lieuRepo.getLieuById(id);
+  }
+
   /// Change le type de lieu a afficher et recharge les POI.
   Future<void> changerType(LieuType type) async {
     _type = type;
@@ -387,6 +392,23 @@ class VilleProvider with ChangeNotifier {
     );
     await _lieuRepo.insertLieu(lieu);
     await _chargerLieuxFavorisPourVille(villeCourante);
+  }
+
+  /// Met à jour un lieu favori en base et dans la liste locale.
+  Future<void> mettreAJourLieu(Lieu lieu) async {
+    if (lieu.id == null) return;
+    await _lieuRepo.updateLieu(lieu);
+    _lieuxFavoris = _lieuxFavoris
+        .map((l) => l.id == lieu.id ? lieu : l)
+        .toList(growable: false);
+    notifyListeners();
+  }
+
+  /// Supprime un lieu favori en base et met à jour l'état local.
+  Future<void> supprimerLieuFavori(int id) async {
+    await _lieuRepo.deleteLieu(id);
+    _lieuxFavoris = _lieuxFavoris.where((l) => l.id != id).toList();
+    notifyListeners();
   }
 
   /// Charge les lieux (POI) pour le type demande et met a jour l'etat UI.

@@ -1,6 +1,6 @@
 // ignore_for_file: deprecated_member_use
 
-import 'package:explorez_votre_ville/widgets/info/carte_meteo.dart';
+import 'package:explorez_votre_ville/widgets/ecran_principal/info/carte_meteo.dart';
 import 'package:flutter/material.dart';
 
 /// Section météo + bouton favori (palette alignée sur MeteoCard).

@@ -92,6 +92,7 @@ class _EcranFavorisState extends State<EcranFavoris> {
                           await provider.deseEpinglerVille();
                         } else {
                           await provider.epinglerVille(v);
+                          await provider.afficherVilleEpinglee();
                         }
                         setState(() {});
                       },

@@ -1,6 +1,6 @@
 import 'package:explorez_votre_ville/models/lieu_type.dart';
-import 'package:explorez_votre_ville/widgets/search/lieu_type_chips.dart';
-import 'package:explorez_votre_ville/widgets/search/search_bar.dart';
+import 'package:explorez_votre_ville/widgets/ecran_principal/search/lieu_type_chips.dart';
+import 'package:explorez_votre_ville/widgets/ecran_principal/search/search_bar.dart';
 import 'package:explorez_votre_ville/widgets/status/error_banner.dart';
 import 'package:flutter/material.dart';
 
