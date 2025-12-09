@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Barre de recherche avec couleurs issues du thème (colorScheme).
 class SearchBarField extends StatelessWidget {
-  // Palette (alignée sur les widgets météo)
-  static const Color _deepGreen = Color(0xFF18534F);
-  static const Color _teal = Color(0xFF226D68);
-  static const Color _mint = Color(0xFFECF8F6);
-  static const Color _amber = Color(0xFFFEEAA1);
-
   final TextEditingController controller;
   final ValueChanged<String> onSubmitted;
 
@@ -18,21 +13,23 @@ class SearchBarField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return TextField(
       controller: controller,
       decoration: InputDecoration(
         hintText: 'Rechercher une ville…',
         filled: true,
-        fillColor: _mint,
-        prefixIcon: const Icon(Icons.search, color: _deepGreen),
-        hintStyle: const TextStyle(color: _deepGreen),
+        fillColor: cs.surface,
+        prefixIcon: Icon(Icons.search, color: cs.onSurface),
+        hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.7)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _teal, width: 1.5),
+          borderSide: BorderSide(color: cs.tertiary, width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color:_amber, width: 1.5),
+          borderSide: BorderSide(color: cs.primary, width: 1.5),
         ),
       ),
       onSubmitted: onSubmitted,

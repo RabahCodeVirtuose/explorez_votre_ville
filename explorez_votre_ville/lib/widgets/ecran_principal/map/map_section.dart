@@ -6,18 +6,9 @@ import 'package:latlong2/latlong.dart';
 import 'poi_marker_layer.dart';
 
 class MapSection extends StatelessWidget {
-  // Palette alignée sur le reste de l'UI
-  static const Color _deepGreen = Color(0xFF18534F);
-  static const Color _teal = Color(0xFF226D68);
-  static const Color _mint = Color(0xFFECF8F6);
-  static const Color _amber = Color(0xFFFEEAA1);
-
   final MapController mapController;
   final LatLng center;
   final List<dynamic> poiMarkers; // LieuApiResult list
-  /*final void Function(dynamic) onPoiTap; déclare un callback qui prend un argument de type dynamic (l’élément POI que tu veux passer) et ne retourne rien. Quand la carte détecte un tap sur
-  un marker, elle appelle ce callback en lui passant le POI concerné. Le type dynamic est utilisé ici pour rester souple sur ce que on envoie (par exemple un LieuApiResult ou un modèle
-  similaire) */
   final void Function(dynamic) onPoiTap;
   final LieuType type;
   const MapSection({
@@ -31,26 +22,31 @@ class MapSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tileUrl =
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+    //isDark
+    // ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+
     return SizedBox(
       height: 220,
       child: Material(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: _amber, width: 1.5),
+          side: BorderSide(color: cs.tertiary, width: 1.5),
         ),
         elevation: 4,
         clipBehavior: Clip.antiAlias,
         child: Container(
-          color: _mint,
+          color: cs.surface,
           child: FlutterMap(
             mapController: mapController,
             options: MapOptions(initialCenter: center, initialZoom: 12),
             children: [
-              // Fond de carte
+              // Fond de carte (voyager)
               TileLayer(
-                // Palette plus chaleureuse via le style "voyager" de Carto
-                urlTemplate:
-                    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                urlTemplate: tileUrl,
                 subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'com.explorez.votre.ville',
               ),
@@ -63,13 +59,13 @@ class MapSection extends StatelessWidget {
                     height: 44,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: _amber.withOpacity(0.5),
+                        color: cs.tertiary.withOpacity(0.5),
                         shape: BoxShape.circle,
-                        border: Border.all(color: _deepGreen, width: 1.0),
+                        border: Border.all(color: cs.onSurface, width: 1.0),
                       ),
                       child: Icon(
                         Icons.location_on,
-                        color: _deepGreen,
+                        color: cs.onSurface,
                         size: 30,
                       ),
                     ),

@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 
+/// Carte météo utilisant le design existant, mais les couleurs viennent du thème
+/// (ColorScheme) pour s’adapter au clair/sombre.
 class MeteoCard extends StatelessWidget {
-  // Palette dédiée
-  static const Color _deepGreen = Color(0xFF18534F);
-  static const Color _teal = Color(0xFF226D68);
-  static const Color _mint = Color(0xFFECF8F6);
-  static const Color _amber = Color(0xFFFEEAA1);
-  static const Color _sand = Color(0xFFD6955B);
-
   final String cityName;
   final double temperature;
   final String icon;
@@ -31,15 +26,22 @@ class MeteoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String iconUrl = 'https://openweathermap.org/img/w/$icon.png';
+    final cs = Theme.of(context).colorScheme;
+    final iconUrl = 'https://openweathermap.org/img/w/$icon.png';
+
+    // Choix de couleurs dérivées du thème pour remplacer les anciennes constantes
+    final baseText = cs.onSurface;
+    final accent = cs.primary; // remplace l’ancien teal
+    final highlight = cs.tertiary; // remplace l’ancien amber/sand
+    final surface = cs.surface; // remplace l’ancien mint
 
     return Card(
-      color: _mint,
+      color: surface,
       margin: const EdgeInsets.all(12),
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: _amber, width: 1.5),
+        side: BorderSide(color: highlight, width: 1.5),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -47,16 +49,16 @@ class MeteoCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Titre + favori en ligne pour compacter
+            // Titre
             Row(
               children: [
                 Expanded(
                   child: Text(
                     cityName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: _deepGreen,
+                      color: baseText,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -65,13 +67,13 @@ class MeteoCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Température avec icône
+            // Température + icône météo
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: _amber.withOpacity(0.7),
+                    color: highlight.withOpacity(0.7),
                     shape: BoxShape.circle,
                   ),
                   padding: const EdgeInsets.all(8),
@@ -87,10 +89,10 @@ class MeteoCard extends StatelessWidget {
                   flex: 1,
                   child: Text(
                     '${temperature.toStringAsFixed(1)} °C',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: _teal,
+                      color: accent,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -99,77 +101,59 @@ class MeteoCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Deux colonnes : météo/humidité et min/max/vent
+            // Deux colonnes
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Colonne 1
+                // Colonne 1 : météo / humidité
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(
-                            Icons.wb_sunny,
-                            size: 16,
-                            color: _sand,
-                          ),
+                          Icon(Icons.wb_sunny, size: 16, color: highlight),
                           const SizedBox(width: 6),
-                          const Text(
-                            'Météo',
-                            style: TextStyle(color: _deepGreen),
-                          ),
+                          Text('Météo', style: TextStyle(color: baseText)),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         description,
-                        style: const TextStyle(color: _deepGreen, fontSize: 12),
+                        style: TextStyle(color: baseText, fontSize: 12),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.opacity,
-                            size: 16,
-                            color: _teal,
-                          ),
+                          Icon(Icons.opacity, size: 16, color: accent),
                           const SizedBox(width: 6),
-                          const Text(
-                            'Humidité',
-                            style: TextStyle(color: _deepGreen),
-                          ),
+                          Text('Humidité', style: TextStyle(color: baseText)),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${humidity.toStringAsFixed(0)}%',
-                        style: const TextStyle(color: _deepGreen),
+                        style: TextStyle(color: baseText),
                       ),
                     ],
                   ),
                 ),
-                // Colonne 2
+                // Colonne 2 : min/max / vent
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(
-                            Icons.thermostat,
-                            size: 16,
-                            color: _sand,
-                          ),
+                          Icon(Icons.thermostat, size: 16, color: highlight),
                           const SizedBox(width: 6),
-                          const Text(
+                          Text(
                             'Min/Max',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: _deepGreen,
+                              color: baseText,
                             ),
                           ),
                         ],
@@ -177,27 +161,20 @@ class MeteoCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         '${temperatureMin.toStringAsFixed(1)}°C / ${temperatureMax.toStringAsFixed(1)}°C',
-                        style: const TextStyle(color: _deepGreen),
+                        style: TextStyle(color: baseText),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.air_sharp,
-                            size: 16,
-                            color: _teal,
-                          ),
+                          Icon(Icons.air_sharp, size: 16, color: accent),
                           const SizedBox(width: 6),
-                          const Text(
-                            'Vent',
-                            style: TextStyle(color: _deepGreen),
-                          ),
+                          Text('Vent', style: TextStyle(color: baseText)),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${windSpeed.toStringAsFixed(1)} km/h',
-                        style: const TextStyle(color: _deepGreen),
+                        style: TextStyle(color: baseText),
                       ),
                     ],
                   ),

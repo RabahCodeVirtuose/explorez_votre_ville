@@ -9,6 +9,7 @@ class LieuEditForm extends StatelessWidget {
   final TextEditingController lonCtrl;
   final LieuType typeSel;
   final ValueChanged<LieuType> onTypeChanged;
+  final bool readOnlyNameType; // true -> nom/type figés
 
   const LieuEditForm({
     super.key,
@@ -18,6 +19,7 @@ class LieuEditForm extends StatelessWidget {
     required this.lonCtrl,
     required this.typeSel,
     required this.onTypeChanged,
+    this.readOnlyNameType = false,
   });
 
   @override
@@ -31,6 +33,7 @@ class LieuEditForm extends StatelessWidget {
             labelText: 'Nom',
             border: OutlineInputBorder(),
           ),
+          enabled: !readOnlyNameType, // figé si true
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<LieuType>(
@@ -47,9 +50,11 @@ class LieuEditForm extends StatelessWidget {
                 ),
               )
               .toList(),
-          onChanged: (v) {
-            if (v != null) onTypeChanged(v);
-          },
+          onChanged: readOnlyNameType
+              ? null
+              : (v) {
+                  if (v != null) onTypeChanged(v);
+                },
         ),
         const SizedBox(height: 10),
         TextField(

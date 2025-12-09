@@ -20,11 +20,11 @@ class EcranEditionLieu extends StatefulWidget {
 }
 
 class _EcranEditionLieuState extends State<EcranEditionLieu> {
-  final _nomCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _latCtrl = TextEditingController();
   final _lonCtrl = TextEditingController();
-  LieuType _typeSel = LieuType.parc;
+  final _nomCtrl = TextEditingController();
+  late LieuType _typeSel;
   bool _initialised = false;
   bool _changed = false; // Pour renvoyer un flag au retour
 
@@ -114,7 +114,8 @@ class _EcranEditionLieuState extends State<EcranEditionLieu> {
                     latCtrl: _latCtrl,
                     lonCtrl: _lonCtrl,
                     typeSel: _typeSel,
-                    onTypeChanged: (v) => setState(() => _typeSel = v),
+                    readOnlyNameType: true, // nom + type figés
+                    onTypeChanged: (v) {}, // non utilisé car readOnly
                   ),
                   const SizedBox(height: 16),
                   const Divider(),

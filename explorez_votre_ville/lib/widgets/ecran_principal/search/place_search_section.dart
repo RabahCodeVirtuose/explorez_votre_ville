@@ -4,10 +4,6 @@ import 'package:explorez_votre_ville/widgets/ecran_principal/search/search_bar.d
 import 'package:explorez_votre_ville/widgets/status/error_banner.dart';
 import 'package:flutter/material.dart';
 
-// Palette alignée sur le reste de l'UI
-const Color _deepGreen = Color(0xFF18534F);
-const Color _teal = Color(0xFF226D68);
-
 class PlaceSearchSection extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onSubmit;
@@ -28,6 +24,8 @@ class PlaceSearchSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -37,9 +35,9 @@ class PlaceSearchSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         if (loading)
-          const LinearProgressIndicator(
-            color: _teal,
-            backgroundColor: _deepGreen,
+          LinearProgressIndicator(
+            color: cs.primary,
+            backgroundColor: cs.surfaceVariant,
           ),
         if (error != null)
           Padding(

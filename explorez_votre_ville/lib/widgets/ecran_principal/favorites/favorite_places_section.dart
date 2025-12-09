@@ -7,11 +7,6 @@ import 'package:flutter/material.dart';
 /// - Tap court  : ouvre l'écran de détail du lieu (route '/details_lieu', arg id).
 /// - Appui long : demande confirmation puis supprime le lieu favori de la base.
 class FavoritePlacesSection extends StatefulWidget {
-  // Palette alignée sur le reste de l'UI
-  static const Color _deepGreen = Color(0xFF18534F);
-  static const Color _mint = Color(0xFFECF8F6);
-  static const Color _amber = Color(0xFFFEEAA1);
-
   /// Lieux favoris à afficher (chargés depuis la base via le provider).
   final List<Lieu> lieux;
 
@@ -31,13 +26,7 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
     _localLieux = List<Lieu>.from(widget.lieux);
   }
 
-/*didUpdateWidget est appelé quand le parent reconstruit ce widget avec de nouvelles propriétés. Ici :
-
-  - oldWidget.lieux est l’ancienne liste passée.
-  - widget.lieux est la nouvelle liste passée.
-  - Si elles diffèrent, on met à jour la copie locale _localLieux (utilisée pour l’affichage/suppression optimiste).
-
-  En résumé, ça synchronise l’état interne _localLieux avec les nouvelles données du parent, pour ne pas rester sur une ancienne liste. */
+  /* Synchronise la liste locale si le parent en fournit une nouvelle. */
   @override
   void didUpdateWidget(covariant FavoritePlacesSection oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -69,15 +58,21 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
       setState(() {
         _localLieux.removeWhere((l) => l.id == lieu.id);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${lieu.nom} retiré des favoris')),
-      );
+
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${lieu.nom} retiré des favoris')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_localLieux.isEmpty) return const SizedBox.shrink();
+
+    // Palette dynamique (clair/sombre) issue du thème
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,19 +81,16 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
           padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4),
           child: Text(
             'Lieux favoris',
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: FavoritePlacesSection._deepGreen,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w700, color: cs.secondary),
           ),
         ),
         SizedBox(
           height: 100,
           child: Container(
             decoration: BoxDecoration(
-              color: FavoritePlacesSection._mint,
+              color: isDark ? cs.surfaceVariant : cs.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: FavoritePlacesSection._amber, width: 1.2),
+              border: Border.all(color: cs.tertiary, width: 1.2),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: ListView.builder(
@@ -107,7 +99,10 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
               itemBuilder: (context, index) {
                 final lieu = _localLieux[index];
                 final icon = LieuTypeHelper.icon(lieu.type);
-                final color = LieuTypeHelper.color(lieu.type);
+                final typeColor = LieuTypeHelper.color(lieu.type);
+                final iconColor = isDark
+                    ? typeColor.withOpacity(0.95)
+                    : typeColor;
                 return Padding(
                   padding: EdgeInsets.only(left: index == 0 ? 0 : 8, right: 8),
                   child: InkWell(
@@ -126,8 +121,8 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
                       children: [
                         CircleAvatar(
                           radius: 22,
-                          backgroundColor: color.withOpacity(0.12),
-                          child: Icon(icon, color: color),
+                          backgroundColor: cs.tertiary.withOpacity(0.9),
+                          child: Icon(icon, color: iconColor),
                         ),
                         const SizedBox(height: 6),
                         SizedBox(
@@ -137,10 +132,7 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
                             textAlign: TextAlign.center,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: FavoritePlacesSection._deepGreen,
-                            ),
+                            style: TextStyle(fontSize: 12, color: cs.onSurface),
                           ),
                         ),
                       ],

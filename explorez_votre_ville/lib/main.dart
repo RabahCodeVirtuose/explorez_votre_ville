@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:provider/provider.dart";
 import "providers/ville_provider.dart";
 import "providers/commentaire_provider.dart";
+import "providers/theme_provider.dart";
 import "screens/ecran_acceuil.dart";
 import "screens/ecran_liste_villes.dart";
 import "screens/ecran_favoris.dart";
@@ -15,6 +16,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => VilleProvider()),
         ChangeNotifierProvider(create: (_) => CommentaireProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: const MyApp(),
     ),
@@ -26,13 +28,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Explorez votre ville',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue, // couleur seed globale
-      ),
+      theme: theme.lightTheme,
+      darkTheme: theme.darkTheme,
+      themeMode: theme.themeMode,
       // Routes principales.
       routes: {
         '/': (_) => const EcranAccueil(),
