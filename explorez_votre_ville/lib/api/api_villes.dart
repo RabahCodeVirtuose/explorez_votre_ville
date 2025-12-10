@@ -13,9 +13,7 @@ const String _geoapifyApiKey = '398f2bfe6c7b42f383d68f82511996d8';
 const String _nominatimUserAgent =
     'ExploreVille/1.0 (contact: rabah.toubal.etudes@gmail.com)';
 
-/// ---
-///  DTO internes pour isoler les réponses API
-/// ---
+/// --- DTO internes pour isoler les réponses API ---
 
 /// Bounding box d’une ville (rectangle géographique).
 class BoundingBoxVille {
@@ -85,7 +83,7 @@ class LieuApiResult {
     required this.categories,
   });
 
-  /// Factory à partir d’un "feature" Geoapify.
+  /// Factory à partir d’un "feature" Geoapify (places).
   factory LieuApiResult.fromGeoapifyFeature(Map<String, dynamic> json) {
     final props = json['properties'] as Map<String, dynamic>;
 
@@ -100,21 +98,32 @@ class LieuApiResult {
           const [],
     );
   }
+
+  /// Factory à partir d’un "feature" Geoapify geocode/search.
+  factory LieuApiResult.fromGeoapifyGeocodeFeature(
+      Map<String, dynamic> json) {
+    final props = json['properties'] as Map<String, dynamic>;
+    return LieuApiResult(
+      name: (props['name'] ?? '') as String,
+      lat: (props['lat'] as num).toDouble(),
+      lon: (props['lon'] as num).toDouble(),
+      formattedAddress: (props['formatted'] ?? '') as String,
+      categories: (props['categories'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+    );
+  }
 }
 
-/// ---
-///  Classe qui regroupe tous les appels "villes & lieux"
-/// ---
+/// Classe qui regroupe tous les appels "villes & lieux".
 class ApiVillesEtLieux {
   static const String _nominatimBase = 'nominatim.openstreetmap.org';
   static const String _geoapifyBase = 'api.geoapify.com';
 
   /// 1) Appel Nominatim : récupère une ville + son bounding box
   /// à partir du nom saisi par l’utilisateur.
-  ///
-  /// Exemple Postman :
-  /// https://nominatim.openstreetmap.org/search?q=Orleans&format=json&limit=5
-       static Future<VilleApiResult> fetchVilleDepuisNominatim(
+  static Future<VilleApiResult> fetchVilleDepuisNominatim(
       String nomVille) async {
     final uri = Uri.https(
       _nominatimBase,
@@ -126,7 +135,7 @@ class ApiVillesEtLieux {
       },
     );
 
-          final response = await http.get(
+    final response = await http.get(
       uri,
       headers: {
         'User-Agent': _nominatimUserAgent,
@@ -152,16 +161,12 @@ class ApiVillesEtLieux {
 
   /// 2) Appel Geoapify : récupère les lieux d’un type donné
   /// dans le bounding box d’une ville.
-  ///
-  /// - [nomVille] : chaîne saisie (ex. "Orléans")
-  /// - [type] : type métier (enum LieuType)
-  /// - [limit] : nombre max de lieux à retourner
   static Future<List<LieuApiResult>> fetchLieuxPourVille({
     required String nomVille,
     required LieuType type,
     int limit = 15,
   }) async {
-    // a) On commence par récupérer la ville et son bbox via Nominatim.
+    // a) Récupérer la ville et son bbox via Nominatim.
     final ville = await fetchVilleDepuisNominatim(nomVille);
     final bbox = ville.bbox;
 
@@ -170,7 +175,7 @@ class ApiVillesEtLieux {
     final rectFilter =
         'rect:${bbox.lonMin},${bbox.latMin},${bbox.lonMax},${bbox.latMax}';
 
-    // b) On traduit le type métier en catégorie Geoapify.
+    // b) Traduire le type métier en catégorie Geoapify.
     final categories = geoapifyCategoryFromLieuType(type);
 
     final uri = Uri.https(
@@ -203,6 +208,60 @@ class ApiVillesEtLieux {
     return features
         .map(
           (f) => LieuApiResult.fromGeoapifyFeature(
+            f as Map<String, dynamic>,
+          ),
+        )
+        .toList();
+  }
+
+  /// Recherche d’un lieu par son nom à l’intérieur du bounding box d’une ville.
+  static Future<List<LieuApiResult>> fetchLieuxParNomDansVille({
+    required String nomVille,
+    required String nomLieu,
+    LieuType? type, // optionnel : filtre par type connu dans l'app
+    int limit = 10,
+  }) async {
+    // 1) Récupérer la ville + bounding box via Nominatim
+    final ville = await fetchVilleDepuisNominatim(nomVille);
+    final bbox = ville.bbox;
+
+    // 2) Construire "bounds" pour Geoapify
+    final bounds =
+        '${bbox.lonMin},${bbox.latMin},${bbox.lonMax},${bbox.latMax}';
+
+    // 3) Appel Geoapify /v1/geocode/search
+    final params = <String, String>{
+      'text': nomLieu,
+      'bounds': bounds,
+      'limit': '$limit',
+      'lang': 'fr',
+      'apiKey': _geoapifyApiKey,
+    };
+    // Si un type est fourni, on ajoute le filtre de catégories Geoapify
+    if (type != null) {
+      params['filter'] = 'rect:$bounds';
+      params['categories'] = geoapifyCategoryFromLieuType(type);
+    }
+
+    final uri = Uri.https(_geoapifyBase, '/v1/geocode/search', params);
+
+    final response = await http.get(
+      uri,
+      headers: const {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Erreur Geoapify geocoding (${response.statusCode}) : ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final features = json['features'] as List<dynamic>? ?? [];
+
+    return features
+        .map(
+          (f) => LieuApiResult.fromGeoapifyGeocodeFeature(
             f as Map<String, dynamic>,
           ),
         )

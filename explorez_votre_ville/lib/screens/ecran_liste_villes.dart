@@ -205,6 +205,8 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
                             poiMarkers: poiMarkers,
                             onPoiTap: (p) => _showPoiDetailsDialog(context, p),
                             type: provider.type,
+                            onSearchByName: (nom, type) =>
+                                provider.chercherLieuxParNom(nom, type: type),
                           ),
                         ),
                         const SizedBox(height: 4),

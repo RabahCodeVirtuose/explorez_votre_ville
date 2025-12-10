@@ -397,6 +397,15 @@ class VilleProvider with ChangeNotifier {
     );
     await _lieuRepo.insertLieu(lieu);
     await _chargerLieuxFavorisPourVille(villeCourante);
+
+    // Ajoute aussi le POI à la liste courante pour affichage sur la carte
+    final exists = _lieux.any(
+      (l) => l.name == poi.name && l.lat == poi.lat && l.lon == poi.lon,
+    );
+    if (!exists) {
+      _lieux = [..._lieux, poi];
+      notifyListeners();
+    }
   }
 
   /// (C) Met à jour un lieu favori en base et dans la liste locale.
@@ -442,5 +451,24 @@ class VilleProvider with ChangeNotifier {
       _loadingLieux = false;
       notifyListeners();
     }
+  }
+
+  /// Recherche des lieux par nom dans la ville actuellement sélectionnée (_lastQuery).
+  /// Utilise le bounding box de la ville pour limiter la recherche Geoapify.
+  Future<List<LieuApiResult>> chercherLieuxParNom(
+    String nomLieu, {
+    int limit = 10,
+    LieuType? type,
+  }) async {
+    if (_lastQuery == null || _lastQuery!.isEmpty) {
+      throw Exception(
+          'Cherche d\'abord une ville avant de filtrer les lieux.');
+    }
+    return ApiVillesEtLieux.fetchLieuxParNomDansVille(
+      nomVille: _lastQuery!,
+      nomLieu: nomLieu,
+      type: type ?? _type,
+      limit: limit,
+    );
   }
 }
