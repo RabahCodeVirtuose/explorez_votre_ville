@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:explorez_votre_ville/models/lieu_type.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,18 +5,21 @@ import 'package:latlong2/latlong.dart';
 
 import 'poi_marker_layer.dart';
 
-/// Section carte avec effet "flip" :
-/// - Face avant : carte FlutterMap + marqueurs (POI + centre ville)
-/// - Face arrière : mini recherche d'un lieu par nom (dans la liste des POI chargés
-///   et/ou via API fournie dans onSearchByName) avec ajout possible en favoris via onPoiTap.
+/// MapSection (version simple, sans 3D) :
+/// - Mode "carte" : FlutterMap + marqueur centre + POI
+/// - Mode "recherche" : champ + bouton + résultats cliquables
+///
+/// Le bouton en bas à droite permet juste de basculer entre les deux vues.
 class MapSection extends StatefulWidget {
   final MapController mapController;
   final LatLng center;
-  final List<dynamic> poiMarkers; // LieuApiResult list
+  final List<dynamic> poiMarkers; // idéalement List<LieuApiResult>
   final void Function(dynamic) onPoiTap;
   final LieuType type;
-  final Future<List<dynamic>> Function(String nom, LieuType type)?
-  onSearchByName;
+
+  /// Callback optionnel : recherche via API.
+  /// Si null => on fait une recherche locale dans poiMarkers.
+  final Future<List<dynamic>> Function(String nom, LieuType type)? onSearchByName;
 
   const MapSection({
     super.key,
@@ -34,62 +35,56 @@ class MapSection extends StatefulWidget {
   State<MapSection> createState() => _MapSectionState();
 }
 
-class _MapSectionState extends State<MapSection>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-  bool _isFront = true;
+class _MapSectionState extends State<MapSection> {
+  // true => on affiche la carte, false => on affiche la recherche
+  bool _isMapVisible = true;
+
   final TextEditingController _searchCtrl = TextEditingController();
   String? _searchMessage;
   List<dynamic> _searchResults = const [];
   bool _searchLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 450),
-    );
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-  }
-
-  @override
   void dispose() {
-    _controller.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  void _toggleCard() {
-    if (_isFront) {
-      _controller.forward();
-    } else {
-      _controller.reverse();
-    }
-    setState(() => _isFront = !_isFront);
+  /// Change simplement la vue affichée (sans animation, sans rotation).
+  void _toggleView() {
+    setState(() => _isMapVisible = !_isMapVisible);
   }
 
+  /// Recherche un POI soit localement, soit via onSearchByName si fourni.
   Future<void> _searchPoi() async {
     final query = _searchCtrl.text.trim().toLowerCase();
+
     if (query.isEmpty) {
       setState(() => _searchMessage = 'Entre un nom de lieu à chercher');
       return;
     }
-    // Si aucun callback fourni, fallback local sur la liste actuelle
+
+    // Fallback local si aucun callback API
     if (widget.onSearchByName == null) {
       final match = widget.poiMarkers.cast<dynamic>().firstWhere(
         (p) => (p.name as String).toLowerCase().contains(query),
         orElse: () => null,
       );
+
       if (match == null) {
-        setState(() => _searchMessage = 'Aucun lieu trouvé pour "$query"');
+        setState(() {
+          _searchResults = const [];
+          _searchMessage = 'Aucun lieu trouvé pour "$query"';
+        });
         return;
       }
+
       setState(() {
-        _searchMessage = 'Lieu trouvé : ${match.name}';
         _searchResults = [match];
+        _searchMessage = 'Lieu trouvé : ${match.name}';
       });
+
+      // Option : on déclenche directement l’action (ex : ajout favoris)
       widget.onPoiTap(match);
       return;
     }
@@ -97,20 +92,18 @@ class _MapSectionState extends State<MapSection>
     setState(() {
       _searchLoading = true;
       _searchMessage = null;
+      _searchResults = const [];
     });
+
     try {
       final results = await widget.onSearchByName!(query, widget.type);
-      if (results.isEmpty) {
-        setState(() {
-          _searchResults = const [];
-          _searchMessage = 'Aucun lieu trouvé pour "$query"';
-        });
-      } else {
-        setState(() {
-          _searchResults = results;
-          _searchMessage = 'Résultats : ${results.length}';
-        });
-      }
+
+      setState(() {
+        _searchResults = results;
+        _searchMessage = results.isEmpty
+            ? 'Aucun lieu trouvé pour "$query"'
+            : 'Résultats : ${results.length}';
+      });
     } catch (e) {
       setState(() {
         _searchResults = const [];
@@ -129,42 +122,22 @@ class _MapSectionState extends State<MapSection>
       height: 220,
       child: Stack(
         children: [
-          GestureDetector(
-            onTap: _toggleCard,
-            child: AnimatedBuilder(
-              animation: _animation,
-              builder: (context, child) {
-                final angle = _animation.value * math.pi;
-                final isFrontVisible = angle < math.pi / 2;
-                final face = isFrontVisible
-                    ? _buildMapFace(cs)
-                    : _buildSearchFace(cs);
-
-                return Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001)
-                    ..rotateY(angle),
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..rotateY(isFrontVisible ? 0 : math.pi),
-                    child: face,
-                  ),
-                );
-              },
-            ),
+          // Affiche simplement l’une des deux faces (aucun flip/3D)
+          Positioned.fill(
+            child: _isMapVisible ? _buildMapFace(cs) : _buildSearchFace(cs),
           ),
+
+          // Bouton pour switch
           Positioned(
             right: 10,
             bottom: 10,
             child: FloatingActionButton(
               mini: true,
-              heroTag: 'flip_map_section',
+              heroTag: 'toggle_map_section',
               backgroundColor: cs.primary,
               foregroundColor: cs.onPrimary,
-              onPressed: _toggleCard,
-              child: const Icon(Icons.flip_camera_android),
+              onPressed: _toggleView,
+              child: Icon(_isMapVisible ? Icons.search : Icons.map),
             ),
           ),
         ],
@@ -173,11 +146,8 @@ class _MapSectionState extends State<MapSection>
   }
 
   Widget _buildMapFace(ColorScheme cs) {
-    final tileUrlLight =
+    final tileUrl =
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tileUrl =  tileUrlLight;
 
     return Material(
       shape: RoundedRectangleBorder(
@@ -190,7 +160,10 @@ class _MapSectionState extends State<MapSection>
         color: cs.surface,
         child: FlutterMap(
           mapController: widget.mapController,
-          options: MapOptions(initialCenter: widget.center, initialZoom: 12),
+          options: MapOptions(
+            initialCenter: widget.center,
+            initialZoom: 12,
+          ),
           children: [
             TileLayer(
               urlTemplate: tileUrl,
@@ -255,7 +228,7 @@ class _MapSectionState extends State<MapSection>
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: 'chercer un lieu...',
+                hintText: 'chercher un lieu...',
                 filled: true,
                 fillColor: cs.surfaceVariant.withOpacity(0.6),
                 border: OutlineInputBorder(
@@ -265,20 +238,14 @@ class _MapSectionState extends State<MapSection>
               ),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _searchLoading ? null : _searchPoi,
-                  icon: const Icon(Icons.search),
-                  label: _searchLoading
-                      ? const Text('Recherche...')
-                      : const Text('Rechercher'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: cs.primary,
-                    foregroundColor: cs.onPrimary,
-                  ),
-                ),
-              ],
+            ElevatedButton.icon(
+              onPressed: _searchLoading ? null : _searchPoi,
+              icon: const Icon(Icons.search),
+              label: Text(_searchLoading ? 'Recherche...' : 'Rechercher'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             if (_searchMessage != null)
@@ -292,7 +259,7 @@ class _MapSectionState extends State<MapSection>
             if (_searchResults.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                'Sélectionne un résultat pour l\'ajouter',
+                'Résultats (clique pour ajouter)',
                 style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
               ),
               const SizedBox(height: 6),
