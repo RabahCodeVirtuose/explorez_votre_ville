@@ -175,10 +175,9 @@ class _MapSectionState extends State<MapSection>
   Widget _buildMapFace(ColorScheme cs) {
     final tileUrlLight =
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-    final tileUrlDark =
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tileUrl = isDark ? tileUrlDark : tileUrlLight;
+    final tileUrl =  tileUrlLight;
 
     return Material(
       shape: RoundedRectangleBorder(

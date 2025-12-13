@@ -50,7 +50,7 @@ class AppMenuDrawer extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.brightness_6),
-              title: const Text('Basculer thÉme clair/sombre'),
+              title: const Text('Basculer theme clair/sombre'),
               onTap: () {
                 Navigator.pop(context);
                 context.read<ThemeProvider>().toggleTheme();
