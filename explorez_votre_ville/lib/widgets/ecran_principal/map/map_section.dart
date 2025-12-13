@@ -18,7 +18,7 @@ class MapSection extends StatefulWidget {
   final void Function(dynamic) onPoiTap;
   final LieuType type;
   final Future<List<dynamic>> Function(String nom, LieuType type)?
-      onSearchByName;
+  onSearchByName;
 
   const MapSection({
     super.key,
@@ -79,9 +79,9 @@ class _MapSectionState extends State<MapSection>
     // Si aucun callback fourni, fallback local sur la liste actuelle
     if (widget.onSearchByName == null) {
       final match = widget.poiMarkers.cast<dynamic>().firstWhere(
-            (p) => (p.name as String).toLowerCase().contains(query),
-            orElse: () => null,
-          );
+        (p) => (p.name as String).toLowerCase().contains(query),
+        orElse: () => null,
+      );
       if (match == null) {
         setState(() => _searchMessage = 'Aucun lieu trouvé pour "$query"');
         return;
@@ -136,8 +136,9 @@ class _MapSectionState extends State<MapSection>
               builder: (context, child) {
                 final angle = _animation.value * math.pi;
                 final isFrontVisible = angle < math.pi / 2;
-                final face =
-                    isFrontVisible ? _buildMapFace(cs) : _buildSearchFace(cs);
+                final face = isFrontVisible
+                    ? _buildMapFace(cs)
+                    : _buildSearchFace(cs);
 
                 return Transform(
                   alignment: Alignment.center,
@@ -255,7 +256,7 @@ class _MapSectionState extends State<MapSection>
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: 'Ex: Parc, Musée...',
+                hintText: 'chercer un lieu...',
                 filled: true,
                 fillColor: cs.surfaceVariant.withOpacity(0.6),
                 border: OutlineInputBorder(
@@ -277,11 +278,6 @@ class _MapSectionState extends State<MapSection>
                     backgroundColor: cs.primary,
                     foregroundColor: cs.onPrimary,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Tape pour retourner la carte',
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
                 ),
               ],
             ),
@@ -310,17 +306,11 @@ class _MapSectionState extends State<MapSection>
                     final r = _searchResults[index];
                     return Padding(
                       padding: EdgeInsets.only(
-                          right: index == _searchResults.length - 1 ? 0 : 8),
+                        right: index == _searchResults.length - 1 ? 0 : 8,
+                      ),
                       child: ActionChip(
-                        avatar: Icon(
-                          Icons.place,
-                          color: cs.primary,
-                          size: 18,
-                        ),
-                        label: Text(
-                          r.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        avatar: Icon(Icons.place, color: cs.primary, size: 18),
+                        label: Text(r.name, overflow: TextOverflow.ellipsis),
                         onPressed: () => widget.onPoiTap(r),
                         backgroundColor: cs.surfaceVariant.withOpacity(0.7),
                       ),

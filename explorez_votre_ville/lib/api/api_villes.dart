@@ -1,4 +1,19 @@
 // lib/api/api_villes.dart
+//
+// Rassemble tous les appels API liés aux villes et aux lieux :
+// - Nominatim (OpenStreetMap) pour trouver une ville + son bounding box
+// - Geoapify /places et /geocode/search pour récupérer des lieux (POI)
+//
+// Modèles internes :
+// - BoundingBoxVille : rectangle géographique (latMin/latMax/lonMin/lonMax)
+// - VilleApiResult  : ville simplifiée (nom + coords + bbox)
+// - LieuApiResult   : lieu simplifié (nom + coords + adresse + catégories)
+//
+// Fonctions clés :
+// - fetchVillesDepuisNominatimList : renvoie plusieurs villes possibles pour un nom
+// - fetchVilleDepuisNominatim      : compat, renvoie la première
+// - fetchLieuxPourVille            : lieux d’un type donné dans le bbox d’une ville
+// - fetchLieuxParNomDansVille      : lieux par nom dans le bbox, avec option de filtre par type
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -6,14 +21,12 @@ import 'package:http/http.dart' as http;
 import '../models/lieu_type.dart';
 import '../utils/lieu_type_mapper.dart';
 
-/// Clé Geoapify (places)
+/// Clé Geoapify (places) – utilisée pour /places et /geocode/search
 const String _geoapifyApiKey = '398f2bfe6c7b42f383d68f82511996d8';
 
 /// User-Agent exigé par Nominatim (respect de la politique d’usage).
 const String _nominatimUserAgent =
     'ExploreVille/1.0 (contact: rabah.toubal.etudes@gmail.com)';
-
-/// --- DTO internes pour isoler les réponses API ---
 
 /// Bounding box d’une ville (rectangle géographique).
 class BoundingBoxVille {
@@ -44,7 +57,7 @@ class VilleApiResult {
     required this.bbox,
   });
 
-  /// Factory à partir du JSON Nominatim (1 élément de la liste).
+  /// Factory à partir du JSON Nominatim (un élément de la liste).
   factory VilleApiResult.fromNominatim(Map<String, dynamic> json) {
     final bbox = json['boundingbox'] as List<dynamic>;
     // Nominatim renvoie [lat_min, lat_max, lon_min, lon_max] (en chaînes)
@@ -83,7 +96,7 @@ class LieuApiResult {
     required this.categories,
   });
 
-  /// Factory à partir d’un "feature" Geoapify (places).
+  /// Factory à partir d’un "feature" Geoapify (endpoint /v2/places).
   factory LieuApiResult.fromGeoapifyFeature(Map<String, dynamic> json) {
     final props = json['properties'] as Map<String, dynamic>;
 
@@ -99,7 +112,7 @@ class LieuApiResult {
     );
   }
 
-  /// Factory à partir d’un "feature" Geoapify geocode/search.
+  /// Factory à partir d’un "feature" Geoapify geocode/search (text search).
   factory LieuApiResult.fromGeoapifyGeocodeFeature(
       Map<String, dynamic> json) {
     final props = json['properties'] as Map<String, dynamic>;
@@ -121,17 +134,17 @@ class ApiVillesEtLieux {
   static const String _nominatimBase = 'nominatim.openstreetmap.org';
   static const String _geoapifyBase = 'api.geoapify.com';
 
-  /// 1) Appel Nominatim : récupère une ville + son bounding box
-  /// à partir du nom saisi par l’utilisateur.
-  static Future<VilleApiResult> fetchVilleDepuisNominatim(
-      String nomVille) async {
+  /// Appel Nominatim : renvoie une liste de villes potentielles pour un nom.
+  static Future<List<VilleApiResult>> fetchVillesDepuisNominatimList(
+      String nomVille,
+      {int limit = 5}) async {
     final uri = Uri.https(
       _nominatimBase,
       '/search',
       {
         'q': nomVille,
         'format': 'json',
-        'limit': '1', // on ne garde que le meilleur résultat
+        'limit': '$limit',
       },
     );
 
@@ -154,22 +167,28 @@ class ApiVillesEtLieux {
       throw Exception('Aucune ville trouvée pour "$nomVille"');
     }
 
-    return VilleApiResult.fromNominatim(
-      body.first as Map<String, dynamic>,
-    );
+    return body
+        .map((e) => VilleApiResult.fromNominatim(e as Map<String, dynamic>))
+        .toList();
   }
 
-  /// 2) Appel Geoapify : récupère les lieux d’un type donné
-  /// dans le bounding box d’une ville.
+  /// Compatibilité : renvoie uniquement la première ville (usage existant).
+  static Future<VilleApiResult> fetchVilleDepuisNominatim(
+      String nomVille) async {
+    final list = await fetchVillesDepuisNominatimList(nomVille, limit: 1);
+    return list.first;
+  }
+
+  /// Appel Geoapify : récupère les lieux d’un type donné dans le bounding box d’une ville.
   static Future<List<LieuApiResult>> fetchLieuxPourVille({
-    required String nomVille,
     required LieuType type,
     int limit = 15,
+    BoundingBoxVille? bboxOverride,
   }) async {
-    // a) Récupérer la ville et son bbox via Nominatim.
-    final ville = await fetchVilleDepuisNominatim(nomVille);
-    final bbox = ville.bbox;
-
+    // a) Bounding box : override fourni ou Nominatim
+    final BoundingBoxVille bbox;
+      bbox = bboxOverride!;
+    
     // Nominatim => bbox [lat_min, lat_max, lon_min, lon_max]
     // Geoapify => filter=rect:lon_min,lat_min,lon_max,lat_max
     final rectFilter =
@@ -215,35 +234,52 @@ class ApiVillesEtLieux {
   }
 
   /// Recherche d’un lieu par son nom à l’intérieur du bounding box d’une ville.
+  /// - Si [bboxOverride] est fourni, aucune requête Nominatim n’est refaite.
+  /// - Si [type] est fourni, on utilise /v2/places avec categories + filter rect.
+  ///   sinon on reste sur geocode/search (bounds + text).
   static Future<List<LieuApiResult>> fetchLieuxParNomDansVille({
-    required String nomVille,
     required String nomLieu,
     LieuType? type, // optionnel : filtre par type connu dans l'app
     int limit = 10,
+    BoundingBoxVille? bboxOverride,
   }) async {
-    // 1) Récupérer la ville + bounding box via Nominatim
-    final ville = await fetchVilleDepuisNominatim(nomVille);
-    final bbox = ville.bbox;
+    // 1) Bounding box : override ou Nominatim
+    late final BoundingBoxVille bbox;
+      bbox = bboxOverride!;
+   
 
     // 2) Construire "bounds" pour Geoapify
     final bounds =
         '${bbox.lonMin},${bbox.latMin},${bbox.lonMax},${bbox.latMax}';
 
-    // 3) Appel Geoapify /v1/geocode/search
-    final params = <String, String>{
-      'text': nomLieu,
-      'bounds': bounds,
-      'limit': '$limit',
-      'lang': 'fr',
-      'apiKey': _geoapifyApiKey,
-    };
-    // Si un type est fourni, on ajoute le filtre de catégories Geoapify
+    // 3) Appel Geoapify : /v2/places si type, sinon geocode/search
+    late final Uri uri;
     if (type != null) {
-      params['filter'] = 'rect:$bounds';
-      params['categories'] = geoapifyCategoryFromLieuType(type);
+      uri = Uri.https(
+        _geoapifyBase,
+        '/v2/places',
+        {
+          'categories': geoapifyCategoryFromLieuType(type),
+          'filter': 'rect:$bounds',
+          'text': nomLieu,
+          'limit': '$limit',
+          'lang': 'fr',
+          'apiKey': _geoapifyApiKey,
+        },
+      );
+    } else {
+      uri = Uri.https(
+        _geoapifyBase,
+        '/v1/geocode/search',
+        {
+          'text': nomLieu,
+          'bounds': bounds,
+          'limit': '$limit',
+          'lang': 'fr',
+          'apiKey': _geoapifyApiKey,
+        },
+      );
     }
-
-    final uri = Uri.https(_geoapifyBase, '/v1/geocode/search', params);
 
     final response = await http.get(
       uri,

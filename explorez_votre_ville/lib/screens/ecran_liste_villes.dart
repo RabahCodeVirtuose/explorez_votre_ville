@@ -1,8 +1,15 @@
+// lib/screens/ecran_liste_villes.dart
+//
+// Écran principal : recherche de ville, affichage météo, carte des lieux,
+// favoris (villes + lieux), sélection de type et recherche de lieux par nom.
+// Actions : ouvrir favoris, basculer thème, gérer statut favori/visité/exploré.
+
 // ignore_for_file: deprecated_member_use
 
 import 'package:explorez_votre_ville/api/api_villes.dart';
 import 'package:explorez_votre_ville/widgets/ecran_principal/dialogs/poi_details_dialog.dart';
 import 'package:explorez_votre_ville/widgets/ecran_principal/favorites/favorite_places_section.dart';
+import 'package:explorez_votre_ville/widgets/ecran_principal/info/app_menu_drawer.dart';
 import 'package:explorez_votre_ville/widgets/ecran_principal/info/carte_meteo.dart';
 import 'package:explorez_votre_ville/widgets/ecran_principal/info/weather_section.dart';
 import 'package:explorez_votre_ville/widgets/ecran_principal/map/map_section.dart';
@@ -12,7 +19,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/theme_provider.dart';
 import '../providers/ville_provider.dart';
 
 class EcranListeVilles extends StatefulWidget {
@@ -30,6 +36,7 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
   @override
   void initState() {
     super.initState();
+    // Au chargement, on réinitialise et on centre sur Paris puis on cherche la ville épinglée éventuelle.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<VilleProvider>();
       provider.reset();
@@ -41,36 +48,68 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     });
   }
 
+  /// Recherche de ville par saisie. Si plusieurs résultats Nominatim, on propose un choix.
   Future<void> _onSearch(String value) async {
     final provider = context.read<VilleProvider>();
-    await provider.chercherVille(value);
-    final centre = provider.mapCenter;
-    setState(() => _center = centre);
-    _mapController.move(centre, 12);
+    final villes = await provider.proposerVilles(value);
+    if (villes.length <= 1) {
+      await provider.chercherVille(value);
+      final centre = provider.mapCenter;
+      setState(() => _center = centre);
+      _mapController.move(centre, 12);
+      return;
+    }
+    final selected = await showDialog<VilleApiResult>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Sélectionne la ville'),
+        children: villes
+            .map(
+              (v) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, v),
+                child: Text(
+                  v.name,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (selected != null) {
+      await provider.appliquerVilleSelectionnee(selected);
+      final centre = provider.mapCenter;
+      setState(() => _center = centre);
+      _mapController.move(centre, 12);
+    }
   }
 
+  /// Affiche les détails d’un POI avec son type courant et ajoute en favoris si demandé.
   void _showPoiDetailsDialog(BuildContext context, LieuApiResult poi) {
+    final currentType = context.read<VilleProvider>().type;
     showDialog(
       context: context,
       builder: (dialogContext) => PoiDetailsDialog(
         poi: poi,
+        currentType: currentType,
         onAdd: () {
           _addPlaceToLocalDatabase(poi);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('${poi.name} ajouté !')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${poi.name} ajouté !')),
+          );
         },
       ),
     );
   }
 
+  /// Ajoute un lieu dans la base via le provider (favori).
   void _addPlaceToLocalDatabase(LieuApiResult poi) {
     final provider = context.read<VilleProvider>();
     provider.ajouterLieuFavori(poi);
   }
 
+  /// Nettoie les messages d’erreur réseau (retire le préfixe "Exception").
   String _friendlyError(String raw) {
-    // Nettoie le préfixe "Exception" pour un message plus pro
     final sanitized = raw.replaceFirst(
       RegExp(r'exception[: ]*', caseSensitive: false),
       '',
@@ -92,7 +131,7 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Corrige le centre de la carte si l’état provider change.
+    // Si le centre change dans le provider, on recadre la carte localement.
     if (_center.latitude != currentCenter.latitude ||
         _center.longitude != currentCenter.longitude) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -116,24 +155,16 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
         ),
         title: const Text('Explorer une ville'),
         actions: [
-          IconButton(
-            tooltip: 'Basculer thème clair/sombre',
-            icon: const Icon(Icons.brightness_6),
-            onPressed: () {
-              context.read<ThemeProvider>().toggleTheme();
-            },
-          ),
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: cs.onPrimary),
-            onPressed: () => Navigator.pushNamed(context, '/favoris'),
-            icon: const Icon(Icons.favorite),
-            label: Text(
-              'Mes villes favorites',
-              style: TextStyle(color: cs.onPrimary),
+          Builder(
+            builder: (ctx) => IconButton(
+              tooltip: 'Menu',
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(ctx).openEndDrawer(),
             ),
           ),
         ],
       ),
+      endDrawer: const AppMenuDrawer(),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -155,6 +186,7 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Barre de recherche + chips de type + gestion des erreurs
                         PlaceSearchSection(
                           controller: _controller,
                           onSubmit: _onSearch,
@@ -173,8 +205,7 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
                         if (meteo != null) ...[
                           const SizedBox(height: 8),
                           SizedBox(
-                            height:
-                                262, // un peu plus haut pour éviter l'overflow
+                            height: 262, // évite l’overflow
                             child: WeatherSection(
                               isFavori: provider.isFavoriActuel,
                               isVisitee: provider.isVisiteeActuelle,
@@ -223,3 +254,4 @@ class _EcranListeVillesState extends State<EcranListeVilles> {
     );
   }
 }
+

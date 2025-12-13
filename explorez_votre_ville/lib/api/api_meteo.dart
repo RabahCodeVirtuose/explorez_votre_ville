@@ -1,25 +1,30 @@
 // lib/api/api_meteo.dart
+//
+// Encapsule les appels HTTP à l'API OpenWeatherMap :
+// - fetchParVille       : météo par nom de ville (requête "q=")
+// - fetchParCoordonnees : météo par latitude/longitude
+//
+// Les données retournées sont converties en WeatherData (modèle interne).
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/weather_data.dart';
 
-///   clé OpenWeatherMap
+/// Clé OpenWeatherMap (remplacer par votre propre clé si besoin)
 const String _owmApiKey = '6f898415520ca9f95850d8ce6f43f075';
 
-/// Classe responsable **uniquement** des appels HTTP vers l'API météo.
-/// Toute la logique "réseau" est ici.
-class ApiMeteo {
-  static const String _baseUrl =
-      'https://api.openweathermap.org/data/2.5/weather';
+/// Base d'URL OpenWeather (endpoint météo courante).
+const String _owmBaseUrl = 'https://api.openweathermap.org/data/2.5/weather';
 
+/// Classe responsable uniquement des appels réseau vers OpenWeather.
+class ApiMeteo {
   /// Récupère la météo par nom de ville.
   ///
-  /// Exemple d’URL (à tester dans Postman) :
-  /// https://api.openweathermap.org/data/2.5/weather?q=Paris&appid=TA_CLE&units=metric&lang=fr
+  /// Exemple d'URL : https://api.openweathermap.org/data/2.5/weather
+  ///   ?q=Paris&appid=VOTRE_CLE&units=metric&lang=fr
   static Future<WeatherData> fetchParVille(String city) async {
     final uri = Uri.parse(
-      '$_baseUrl?q=$city&appid=$_owmApiKey&units=metric&lang=fr',
+      '$_owmBaseUrl?q=$city&appid=$_owmApiKey&units=metric&lang=fr',
     );
 
     final response = await http.get(uri);
@@ -36,14 +41,14 @@ class ApiMeteo {
 
   /// Récupère la météo par coordonnées (latitude / longitude).
   ///
-  /// Exemple pour Postman :
-  /// https://api.openweathermap.org/data/2.5/weather?lat=48.85&lon=2.35&appid=TA_CLE&units=metric&lang=fr
+  /// Exemple d'URL : https://api.openweathermap.org/data/2.5/weather
+  ///   ?lat=48.85&lon=2.35&appid=VOTRE_CLE&units=metric&lang=fr
   static Future<WeatherData> fetchParCoordonnees({
     required double latitude,
     required double longitude,
   }) async {
     final uri = Uri.parse(
-      '$_baseUrl?lat=$latitude&lon=$longitude&appid=$_owmApiKey&units=metric&lang=fr',
+      '$_owmBaseUrl?lat=$latitude&lon=$longitude&appid=$_owmApiKey&units=metric&lang=fr',
     );
 
     final response = await http.get(uri);

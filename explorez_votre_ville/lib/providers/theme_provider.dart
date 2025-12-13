@@ -1,8 +1,13 @@
-// ignore_for_file: deprecated_member_use
+// lib/providers/theme_provider.dart
+//
+// Gère le thème clair/sombre à partir de deux palettes définies.
+// Expose :
+// - themeMode (clair/sombre)
+// - lightTheme / darkTheme (ColorScheme + quelques réglages AppBar/scaffold)
+// - toggleTheme() et setThemeMode()
 
 import 'package:flutter/material.dart';
 
-/// Provider pour gérer le thème clair/sombre basé sur deux palettes définies.
 class ThemeProvider with ChangeNotifier {
   ThemeMode _mode = ThemeMode.light;
   ThemeMode get themeMode => _mode;
@@ -21,6 +26,7 @@ class ThemeProvider with ChangeNotifier {
   static const Color _offWhite = Color(0xFFE8EDDF);
   static const Color _grey = Color(0xFFCFDBD5);
 
+  /// Thème clair (ColorScheme + AppBar/scaffold)
   ThemeData get lightTheme {
     final scheme = ColorScheme.light(
       primary: _teal,
@@ -32,20 +38,18 @@ class ThemeProvider with ChangeNotifier {
       surface: Colors.white,
       onSurface: _deepGreen,
       tertiary: _amber,
-      
     );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: _mint,
-      appBarTheme: AppBarTheme(
-        backgroundColor: _mint,
-        foregroundColor: _deepGreen,
+      appBarTheme: const AppBarTheme(
         elevation: 0,
       ),
     );
   }
 
+  /// Thème sombre (ColorScheme + AppBar/scaffold)
   ThemeData get darkTheme {
     final scheme = ColorScheme.dark(
       primary: _offWhite,
@@ -62,19 +66,19 @@ class ThemeProvider with ChangeNotifier {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: _charcoal1,
-      appBarTheme: AppBarTheme(
-        backgroundColor: _charcoal1,
-        foregroundColor: _offWhite,
+      appBarTheme: const AppBarTheme(
         elevation: 0,
       ),
     );
   }
 
+  /// Bascule clair <-> sombre
   void toggleTheme() {
     _mode = _mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
   }
 
+  /// Fixe explicitement le mode (utile pour persister plus tard si besoin)
   void setThemeMode(ThemeMode mode) {
     _mode = mode;
     notifyListeners();
