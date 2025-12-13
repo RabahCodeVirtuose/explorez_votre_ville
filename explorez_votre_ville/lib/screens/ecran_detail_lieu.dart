@@ -6,8 +6,6 @@ import '../providers/ville_provider.dart';
 import '../widgets/ecran_detail/comments_section.dart';
 import '../widgets/ecran_detail/lieu_header.dart';
 
-/// Détail d'un lieu favori (nom, type, adresse, coordonnées + commentaires).
-/// Attend un `int` (id du lieu) passé via `Navigator.pushNamed(..., arguments: id)`.
 class EcranDetailLieu extends StatefulWidget {
   final int? lieuId;
   const EcranDetailLieu({super.key, required this.lieuId});
@@ -17,12 +15,8 @@ class EcranDetailLieu extends StatefulWidget {
 }
 
 class _EcranDetailLieuState extends State<EcranDetailLieu> {
-  // Pas de contrôleurs ici : l'ajout/édition de commentaires
-  // se fait uniquement dans l'écran d’édition pour éviter les doublons.
-
   @override
   Widget build(BuildContext context) {
-    // Si aucun id n'est fourni, on affiche une erreur simple.
     if (widget.lieuId == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Détail du lieu')),
@@ -45,9 +39,7 @@ class _EcranDetailLieuState extends State<EcranDetailLieu> {
                 '/edit_lieu',
                 arguments: widget.lieuId,
               );
-              if (result == true && mounted) {
-                setState(() {});
-              }
+              if (result == true && mounted) setState(() {});
             },
           ),
         ],
@@ -58,6 +50,7 @@ class _EcranDetailLieuState extends State<EcranDetailLieu> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
           if (snapshot.hasError) {
             return Center(
               child: Padding(
@@ -70,6 +63,7 @@ class _EcranDetailLieuState extends State<EcranDetailLieu> {
               ),
             );
           }
+
           final lieu = snapshot.data;
           if (lieu == null) {
             return const Center(child: Text('Lieu introuvable.'));
@@ -80,13 +74,8 @@ class _EcranDetailLieuState extends State<EcranDetailLieu> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // En-tête du lieu (nom/type/coordonnées)
                 LieuHeader(lieu: lieu),
-
-                
                 const Divider(height: 24),
-
-                // Liste des commentaires (lecture seule)
                 CommentsSection(lieuId: lieu.id!),
               ],
             ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 /// Section UI qui affiche la liste des lieux favoris de la ville courante.
 /// - Tap court  : ouvre l'écran de détail du lieu (route '/details_lieu', arg id).
 /// - Appui long : demande confirmation puis supprime le lieu favori de la base.
+/// - Hero sur l'icône pour animer la transition vers la page détail.
 class FavoritePlacesSection extends StatefulWidget {
   /// Lieux favoris à afficher (chargés depuis la base via le provider).
   final List<Lieu> lieux;
@@ -26,7 +27,6 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
     _localLieux = List<Lieu>.from(widget.lieux);
   }
 
-  /* Synchronise la liste locale si le parent en fournit une nouvelle. */
   @override
   void didUpdateWidget(covariant FavoritePlacesSection oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -58,7 +58,6 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
       setState(() {
         _localLieux.removeWhere((l) => l.id == lieu.id);
       });
-
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(
         context,
@@ -70,7 +69,6 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
   Widget build(BuildContext context) {
     if (_localLieux.isEmpty) return const SizedBox.shrink();
 
-    // Palette dynamique (clair/sombre) issue du thème
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -85,14 +83,14 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
           ),
         ),
         SizedBox(
-          height: 100,
+          height: 130, // un peu plus haut pour éviter tout overflow
           child: Container(
             decoration: BoxDecoration(
               color: isDark ? cs.surfaceVariant : cs.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: cs.tertiary, width: 1.2),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: _localLieux.length,
@@ -103,10 +101,11 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
                 final iconColor = isDark
                     ? typeColor.withOpacity(0.95)
                     : typeColor;
+                final heroTag = 'lieu-hero-${lieu.id}';
+
                 return Padding(
                   padding: EdgeInsets.only(left: index == 0 ? 0 : 8, right: 8),
                   child: InkWell(
-                    // Tap court : ouvrir la page détail
                     onTap: () {
                       Navigator.pushNamed(
                         context,
@@ -114,28 +113,63 @@ class _FavoritePlacesSectionState extends State<FavoritePlacesSection> {
                         arguments: lieu.id,
                       );
                     },
-                    // Appui long : confirmation puis suppression
                     onLongPress: () => _confirmAndDelete(lieu),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: cs.tertiary.withOpacity(0.9),
-                          child: Icon(icon, color: iconColor),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOut,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceVariant.withOpacity(
+                          isDark ? 0.4 : 0.6,
                         ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          width: 90,
-                          child: Text(
-                            lieu.nom,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: cs.onSurface),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.tertiary, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Hero(
+                            tag: heroTag,
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: cs.tertiary.withOpacity(0.9),
+                              child: Icon(icon, color: iconColor, size: 20),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: 95,
+                            child: Text(
+                              lieu.nom,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            LieuTypeHelper.label(lieu.type),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: iconColor,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

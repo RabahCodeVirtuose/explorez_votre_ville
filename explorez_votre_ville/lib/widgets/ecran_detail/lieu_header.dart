@@ -1,26 +1,55 @@
 import 'package:flutter/material.dart';
 import '../../models/lieu.dart';
+import '../../models/lieu_type.dart';
 
-/// Bloc d’en-tête pour le détail d’un lieu : nom, type, description, coordonnées.
 class LieuHeader extends StatelessWidget {
   final Lieu lieu;
   const LieuHeader({super.key, required this.lieu});
 
   @override
   Widget build(BuildContext context) {
+    final icon = LieuTypeHelper.icon(lieu.type);
+    final typeLabel = LieuTypeHelper.label(lieu.type);
+    final heroTag = 'lieu-hero-${lieu.id ?? lieu.nom}';
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          lieu.nom,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.category, size: 18),
-            const SizedBox(width: 6),
-            Text(lieu.type.name),
+            Hero(
+              tag: heroTag,
+              child: CircleAvatar(
+                radius: 30,
+                backgroundColor: cs.tertiary.withOpacity(0.9),
+                child: Icon(icon, color: cs.onSurface, size: 30),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lieu.nom,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.category, size: 16),
+                      const SizedBox(width: 6),
+                      Text(typeLabel),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
