@@ -412,16 +412,64 @@
     }
 
     /// Recherche des lieux par nom dans la ville sélectionnée (via bbox).
-    Future<List<LieuApiResult>> chercherLieuxParNom(
-      String nomLieu, {
-      int limit = 10,
-      LieuType? type,
-    }) async {
-      return ApiVillesEtLieux.fetchLieuxParNomDansVille(
-        nomLieu: nomLieu,
-        type: type ?? _type,
-        bboxOverride: _ville?.bbox,
-        limit: limit,
-      );
-    }
+  Future<List<LieuApiResult>> chercherLieuxParNom(
+    String nomLieu, {
+    int limit = 10,
+    LieuType? type,
+  }) async {
+    return ApiVillesEtLieux.fetchLieuxParNomDansVille(
+      nomLieu: nomLieu,
+      type: type ?? _type,
+      bboxOverride: _ville?.bbox,
+      limit: limit,
+    );
   }
+
+  /// Ajoute un lieu personnalisé à la position cliquée sur la carte.
+  /// - Vérifie la présence d’une ville et d’un bbox
+  /// - Vérifie que le point est dans le bbox courant
+  /// - Insère en base et recharge les favoris
+  /// Retourne null si succès, sinon un message d’erreur.
+  Future<String?> ajouterLieuPersonnalise({
+    required double lat,
+    required double lon,
+    required String nom,
+    required LieuType type,
+    String? description,
+  }) async {
+    final bbox = _ville?.bbox;
+    if (_weather == null || bbox == null) {
+      return 'Aucune ville courante ou bbox indisponible.';
+    }
+
+    final dansBBox = lat >= bbox.latMin &&
+        lat <= bbox.latMax &&
+        lon >= bbox.lonMin &&
+        lon <= bbox.lonMax;
+    if (!dansBBox) {
+      return 'Le point sélectionné est hors de la zone de la ville.';
+    }
+
+    final villeCourante = await _getOrInsertVilleCourante();
+    if (villeCourante == null || villeCourante.id == null) {
+      return 'Impossible de récupérer la ville courante.';
+    }
+
+    final lieu = Lieu(
+      villeId: villeCourante.id!,
+      nom: nom.isEmpty ? '(Sans nom)' : nom,
+      type: type,
+      latitude: lat,
+      longitude: lon,
+      description: description ?? '',
+    );
+    await _lieuRepo.insertLieu(lieu);
+
+    // Recharge les favoris pour rester synchronisé
+    await _chargerLieuxFavorisPourVille(villeCourante);
+
+    // On ne l'ajoute pas à la liste des POI affichés (restera seulement en base)
+    notifyListeners();
+    return null;
+  }
+}

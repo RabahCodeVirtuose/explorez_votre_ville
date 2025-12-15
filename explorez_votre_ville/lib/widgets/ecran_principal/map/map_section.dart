@@ -2,7 +2,9 @@ import 'package:explorez_votre_ville/models/lieu_type.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 
+import '../../../providers/ville_provider.dart';
 import 'poi_marker_layer.dart';
 
 /// MapSection (version simple, sans 3D) :
@@ -53,6 +55,69 @@ class _MapSectionState extends State<MapSection> {
   /// Change simplement la vue affichée (sans animation, sans rotation).
   void _toggleView() {
     setState(() => _isMapVisible = !_isMapVisible);
+  }
+
+  /// Tap sur la carte : propose d'ajouter un lieu personnalisé à cette position.
+  Future<void> _onMapTap(BuildContext context, LatLng pos) async {
+    final cs = Theme.of(context).colorScheme;
+    final nameCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ajouter un lieu ici ?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Lat: ${pos.latitude.toStringAsFixed(5)} | '
+              'Lon: ${pos.longitude.toStringAsFixed(5)}',
+              style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Nom du lieu',
+                hintText: 'Ex : Lieu personnalisé',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Ajouter'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final provider = context.read<VilleProvider>();
+    final err = await provider.ajouterLieuPersonnalise(
+      lat: pos.latitude,
+      lon: pos.longitude,
+      nom: nameCtrl.text.trim(),
+      type: widget.type,
+    );
+
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lieu ajouté et sauvegardé')),
+      );
+    }
   }
 
   /// Recherche un POI soit localement, soit via onSearchByName si fourni.
@@ -163,6 +228,7 @@ class _MapSectionState extends State<MapSection> {
           options: MapOptions(
             initialCenter: widget.center,
             initialZoom: 12,
+            onTap: (tapPos, latlng) => _onMapTap(context, latlng),
           ),
           children: [
             TileLayer(
