@@ -83,9 +83,11 @@ et la maintenance du code :
 ---
 ## Important
 
-La persistance des données via SQLite fonctionne uniquement sur Android.
-Il est donc nécessaire d’exécuter l’application sur un émulateur Android
-ou sur un appareil Android réel pour bénéficier de cette fonctionnalité.
+La persistance des données via SQLite fonctionne uniquement sur mobile.
+Elle n’est pas prise en charge lors de l’exécution sur navigateur (Flutter Web).
+
+Il est donc recommandé d’utiliser un émulateur pour tester correctement l’application.
+
 
 ---
 
