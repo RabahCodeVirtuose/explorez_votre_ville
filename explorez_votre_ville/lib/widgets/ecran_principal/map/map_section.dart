@@ -7,21 +7,35 @@ import 'package:provider/provider.dart';
 import '../../../providers/ville_provider.dart';
 import 'poi_marker_layer.dart';
 
-/// MapSection (version simple, sans 3D) :
-/// - Mode "carte" : FlutterMap + marqueur centre + POI
-/// - Mode "recherche" : champ + bouton + résultats cliquables
-///
-/// Le bouton en bas à droite permet juste de basculer entre les deux vues.
+// MapSection version 
+// On a deux vues
+// 1 la carte avec les markers et la possibilité d ajouter un lieu personnalisé
+// 2 une vue recherche avec un champ et des résultats cliquables
+// Le bouton en bas à droite sert juste à basculer entre les deux vues
 class MapSection extends StatefulWidget {
+  // Contrôleur de carte passé par le parent
+  // Comme ça le parent peut  déplacer la carte si besoin
   final MapController mapController;
+
+  // Centre courant de la carte
   final LatLng center;
-  final List<dynamic> poiMarkers; // idéalement List<LieuApiResult>
+
+  // Liste de POI à afficher sur la carte
+  // Ici c est dynamic pour rester compatible avec ton code actuel
+  // Mais idéalement on mettrait List<LieuApiResult>
+  final List<dynamic> poiMarkers;
+
+  // Callback quand on tape sur un POI (marker ou résultat de recherche)
   final void Function(dynamic) onPoiTap;
+
+  // Type courant sélectionné dans l appli
+  // Il sert à afficher les bons markers et à créer un lieu personnalisé du bon type
   final LieuType type;
 
-  /// Callback optionnel : recherche via API.
-  /// Si null => on fait une recherche locale dans poiMarkers.
-  final Future<List<dynamic>> Function(String nom, LieuType type)? onSearchByName;
+  // Callback optionnel pour rechercher par nom via une API
+  // Si null on fait une recherche locale dans la liste poiMarkers
+  final Future<List<dynamic>> Function(String nom, LieuType type)?
+  onSearchByName;
 
   const MapSection({
     super.key,
@@ -38,30 +52,45 @@ class MapSection extends StatefulWidget {
 }
 
 class _MapSectionState extends State<MapSection> {
-  // true => on affiche la carte, false => on affiche la recherche
+  // true on affiche la carte
+  // false on affiche la recherche
   bool _isMapVisible = true;
 
+  // Controller du champ de recherche
   final TextEditingController _searchCtrl = TextEditingController();
+
+  // Message affiché après une recherche (succès ou erreur)
   String? _searchMessage;
+
+  // Liste des résultats de recherche
+  // On garde dynamic pour rester cohérent avec widget.onSearchByName
   List<dynamic> _searchResults = const [];
+
+  // Permet de désactiver le bouton quand on est en train de charger
   bool _searchLoading = false;
 
   @override
   void dispose() {
+    // On libère le controller pour éviter une fuite mémoire
     _searchCtrl.dispose();
     super.dispose();
   }
 
-  /// Change simplement la vue affichée (sans animation, sans rotation).
+  // On bascule juste la vue affichée
   void _toggleView() {
     setState(() => _isMapVisible = !_isMapVisible);
   }
 
-  /// Tap sur la carte : propose d'ajouter un lieu personnalisé à cette position.
+  // Quand on tape sur la carte on propose d ajouter un lieu personnalisé
+  // On ouvre un dialog pour saisir le nom
   Future<void> _onMapTap(BuildContext context, LatLng pos) async {
     final cs = Theme.of(context).colorScheme;
+
+    // Controller du champ du dialog
+    // On le crée ici car il sert seulement pendant la fenêtre de confirmation
     final nameCtrl = TextEditingController();
 
+    // showDialog renvoie true si on confirme l ajout
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -70,12 +99,15 @@ class _MapSectionState extends State<MapSection> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // On affiche les coordonnées pour que l utilisateur comprenne où on ajoute
             Text(
               'Lat: ${pos.latitude.toStringAsFixed(5)} | '
               'Lon: ${pos.longitude.toStringAsFixed(5)}',
               style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
             ),
             const SizedBox(height: 8),
+
+            // Champ pour le nom du lieu
             TextField(
               controller: nameCtrl,
               decoration: const InputDecoration(
@@ -86,10 +118,13 @@ class _MapSectionState extends State<MapSection> {
           ],
         ),
         actions: [
+          // Annuler renvoie false
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Annuler'),
           ),
+
+          // Ajouter renvoie true
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Ajouter'),
@@ -98,8 +133,11 @@ class _MapSectionState extends State<MapSection> {
       ),
     );
 
+    // Si on annule on ne fait rien
     if (confirmed != true) return;
 
+    // On appelle le provider pour faire la logique métier
+    // Le provider vérifie le bbox et insère en base
     final provider = context.read<VilleProvider>();
     final err = await provider.ajouterLieuPersonnalise(
       lat: pos.latitude,
@@ -108,11 +146,12 @@ class _MapSectionState extends State<MapSection> {
       type: widget.type,
     );
 
+    // mounted permet de vérifier qu on est toujours sur la page
     if (!mounted) return;
+
+    // On affiche un message simple selon le résultat
     if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(err)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lieu ajouté et sauvegardé')),
@@ -120,16 +159,17 @@ class _MapSectionState extends State<MapSection> {
     }
   }
 
-  /// Recherche un POI soit localement, soit via onSearchByName si fourni.
+  // Recherche un POI soit en local soit via l API si onSearchByName est fourni
   Future<void> _searchPoi() async {
     final query = _searchCtrl.text.trim().toLowerCase();
 
+    // Petite validation simple
     if (query.isEmpty) {
       setState(() => _searchMessage = 'Entre un nom de lieu à chercher');
       return;
     }
 
-    // Fallback local si aucun callback API
+    // Si on n a pas de callback API on fait un match local dans la liste
     if (widget.onSearchByName == null) {
       final match = widget.poiMarkers.cast<dynamic>().firstWhere(
         (p) => (p.name as String).toLowerCase().contains(query),
@@ -149,11 +189,14 @@ class _MapSectionState extends State<MapSection> {
         _searchMessage = 'Lieu trouvé : ${match.name}';
       });
 
-      // Option : on déclenche directement l’action (ex : ajout favoris)
+      // Ici on déclenche directement l action du parent
+      // Par exemple le parent peut ajouter le lieu en favoris
       widget.onPoiTap(match);
       return;
     }
 
+    // Mode API
+    // On affiche un état chargement
     setState(() {
       _searchLoading = true;
       _searchMessage = null;
@@ -161,8 +204,10 @@ class _MapSectionState extends State<MapSection> {
     });
 
     try {
+      // On lance la recherche via le callback fourni
       final results = await widget.onSearchByName!(query, widget.type);
 
+      // On met à jour l UI avec le nombre de résultats
       setState(() {
         _searchResults = results;
         _searchMessage = results.isEmpty
@@ -170,11 +215,13 @@ class _MapSectionState extends State<MapSection> {
             : 'Résultats : ${results.length}';
       });
     } catch (e) {
+      // En cas d erreur on affiche un message simple
       setState(() {
         _searchResults = const [];
         _searchMessage = 'Erreur de recherche : $e';
       });
     } finally {
+      // On enlève l état chargement
       setState(() => _searchLoading = false);
     }
   }
@@ -183,16 +230,19 @@ class _MapSectionState extends State<MapSection> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    // On fixe une hauteur stable pour la carte
+    // On utilise Stack pour superposer la vue et le bouton en bas à droite
     return SizedBox(
       height: 220,
       child: Stack(
         children: [
-          // Affiche simplement l’une des deux faces (aucun flip/3D)
+          // On affiche soit la carte soit la recherche
+          // Positioned.fill force le widget à prendre toute la place
           Positioned.fill(
             child: _isMapVisible ? _buildMapFace(cs) : _buildSearchFace(cs),
           ),
 
-          // Bouton pour switch
+          // Bouton flottant mini pour basculer entre les deux
           Positioned(
             right: 10,
             bottom: 10,
@@ -211,9 +261,12 @@ class _MapSectionState extends State<MapSection> {
   }
 
   Widget _buildMapFace(ColorScheme cs) {
+    // URL du fond de carte
+    // Ici on utilise Carto Voyager car c est léger et lisible
     final tileUrl =
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
+    // Material donne un rendu type carte avec bordure et ombre
     return Material(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -226,16 +279,22 @@ class _MapSectionState extends State<MapSection> {
         child: FlutterMap(
           mapController: widget.mapController,
           options: MapOptions(
+            // Centre initial de la carte
             initialCenter: widget.center,
             initialZoom: 12,
+
+            // Tap sur la carte pour ajouter un lieu personnalisé
             onTap: (tapPos, latlng) => _onMapTap(context, latlng),
           ),
           children: [
+            // Couche du fond de carte
             TileLayer(
               urlTemplate: tileUrl,
               subdomains: const ['a', 'b', 'c', 'd'],
               userAgentPackageName: 'com.explorez.votre.ville',
             ),
+
+            // Marker central (la ville)
             MarkerLayer(
               markers: [
                 Marker(
@@ -257,6 +316,9 @@ class _MapSectionState extends State<MapSection> {
                 ),
               ],
             ),
+
+            // Couche des POI (markers dynamiques)
+            // PoiMarkerLayer s occupe de dessiner l icône et le nom
             PoiMarkerLayer(
               pois: widget.poiMarkers.cast(),
               onTap: widget.onPoiTap,
@@ -269,6 +331,7 @@ class _MapSectionState extends State<MapSection> {
   }
 
   Widget _buildSearchFace(ColorScheme cs) {
+    // Même look que la carte pour rester cohérent
     return Material(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -283,6 +346,7 @@ class _MapSectionState extends State<MapSection> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Titre simple de la section recherche
             Text(
               'Chercher un lieu par nom',
               style: TextStyle(
@@ -290,7 +354,10 @@ class _MapSectionState extends State<MapSection> {
                 color: cs.onSurface,
               ),
             ),
+
             const SizedBox(height: 8),
+
+            // Champ de saisie de la recherche
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
@@ -303,7 +370,11 @@ class _MapSectionState extends State<MapSection> {
                 ),
               ),
             ),
+
             const SizedBox(height: 10),
+
+            // Bouton de recherche
+            // On le désactive pendant le chargement
             ElevatedButton.icon(
               onPressed: _searchLoading ? null : _searchPoi,
               icon: const Icon(Icons.search),
@@ -313,7 +384,10 @@ class _MapSectionState extends State<MapSection> {
                 foregroundColor: cs.onPrimary,
               ),
             ),
+
             const SizedBox(height: 8),
+
+            // Message de statut si on en a un
             if (_searchMessage != null)
               Text(
                 _searchMessage!,
@@ -322,6 +396,8 @@ class _MapSectionState extends State<MapSection> {
                   fontStyle: FontStyle.italic,
                 ),
               ),
+
+            // Résultats cliquables
             if (_searchResults.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
@@ -329,6 +405,8 @@ class _MapSectionState extends State<MapSection> {
                 style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
               ),
               const SizedBox(height: 6),
+
+              // Liste horizontale de chips
               SizedBox(
                 height: 70,
                 child: ListView.builder(
@@ -336,6 +414,8 @@ class _MapSectionState extends State<MapSection> {
                   itemCount: _searchResults.length,
                   itemBuilder: (context, index) {
                     final r = _searchResults[index];
+
+                    // Padding à droite sauf pour le dernier élément
                     return Padding(
                       padding: EdgeInsets.only(
                         right: index == _searchResults.length - 1 ? 0 : 8,

@@ -1,435 +1,502 @@
-  import 'package:flutter/foundation.dart';
-  import 'package:latlong2/latlong.dart';
-  import 'package:shared_preferences/shared_preferences.dart';
+// lib/providers/ville_provider.dart
+//
+// Provider central de l application
+// On gère ici la ville courante la météo les lieux POI et les favoris
+// On sépare l état et les actions pour garder un fichier lisible
+// On utilise notifyListeners quand on change un état visible par l UI
 
-  import '../api/api_meteo.dart';
-  import '../api/api_villes.dart';
-  import '../db/repository/lieu_repository.dart';
-  import '../db/repository/ville_repository.dart';
-  import '../models/lieu.dart';
-  import '../models/lieu_type.dart';
-  import '../models/weather_data.dart';
-  import '../models/ville.dart';
+import 'package:flutter/foundation.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-  /// Provider central qui pilote :
-  /// - Ville + météo courantes (APIs)
-  /// - Lieux (POI) par type (APIs)
-  /// - Favoris (villes + lieux) en base SQLite (+ statuts visitée/explorée)
-  /// - Ville épinglée dans SharedPreferences
+import '../api/api_meteo.dart';
+import '../api/api_villes.dart';
+import '../db/repository/lieu_repository.dart';
+import '../db/repository/ville_repository.dart';
+import '../models/lieu.dart';
+import '../models/lieu_type.dart';
+import '../models/weather_data.dart';
+import '../models/ville.dart';
 
-/*
-  - (A) État de base : ville/météo, erreurs, chargement
-  - (B) Lieux/POI : liste, type courant, chargement
-  - (C) Favoris + statuts : ville favorite, visitée, explorée, lieux favoris
-  - (D) Pinned : ville épinglée en SharedPreferences
-  - (E) Repositories DB
-  - (F) Getters
-  - (G) Reset global
-  - (H) Outils DB ville
-  - (I) Pinned helpers
-  - (J) Favoris villes (CRUD + synchronisation)
-  - (K) Sélection de ville via liste Nominatim
-  - (L) Recherche ville simple
-  - (M) Lieux favoris (CRUD)
-  - (N) Chargement des POI (via bbox) + recherche de lieux par nom (bbox)
+class VilleProvider with ChangeNotifier {
+  // Etat principal
+  final LatLng _defaultCenter = const LatLng(48.8566, 2.3522);
 
+  WeatherData? _weather;
+  VilleApiResult? _ville;
 
+  bool _loading = false;
+  String? _error;
 
- */
+  // Lieux POI chargés depuis Geoapify
+  List<LieuApiResult> _lieux = <LieuApiResult>[];
+  LieuType _type = LieuType.parc;
+  bool _loadingLieux = false;
 
+  // Favoris et statuts de la ville courante
+  bool _isFavoriActuel = false;
+  bool _isVisiteeActuelle = false;
+  bool _isExploreeActuelle = false;
 
-  class VilleProvider with ChangeNotifier {
-    // (A) État de base --------------------------------------------------------
-    final LatLng _defaultCenter = const LatLng(48.8566, 2.3522);
-    WeatherData? _weather;
-    VilleApiResult? _ville; // contient notamment bbox pour les POI
+  // Favoris lieux stockés en base pour la ville courante
+  List<Lieu> _lieuxFavoris = <Lieu>[];
 
-    bool _loading = false;
-    String? _error;
+  // Ville épinglée en local
+  int? _pinnedVilleId;
 
-    // (B) Lieux / POI ---------------------------------------------------------
-    List<LieuApiResult> _lieux = <LieuApiResult>[];
-    LieuType _type = LieuType.parc;
-    bool _loadingLieux = false;
+  // Accès base locale
+  final VilleRepository _villeRepo = VilleRepository();
+  final LieuRepository _lieuRepo = LieuRepository();
 
-    // (C) Favoris + statuts ---------------------------------------------------
-    bool _isFavoriActuel = false;
-    bool _isVisiteeActuelle = false;
-    bool _isExploreeActuelle = false;
-    List<Lieu> _lieuxFavoris = <Lieu>[];
+  // Getters pour l UI
+  WeatherData? get weather => _weather;
+  VilleApiResult? get ville => _ville;
 
-    // (D) Ville épinglée (SharedPrefs) ----------------------------------------
-    int? _pinnedVilleId;
+  bool get loading => _loading;
+  String? get error => _error;
 
-    // (E) Accès base locale ---------------------------------------------------
-    final VilleRepository _villeRepo = VilleRepository();
-    final LieuRepository _lieuRepo = LieuRepository();
+  List<LieuApiResult> get lieux => _lieux;
+  LieuType get type => _type;
+  bool get loadingLieux => _loadingLieux;
 
-    // (F) Getters exposés -----------------------------------------------------
-    WeatherData? get weather => _weather;
-    VilleApiResult? get ville => _ville;
-    bool get loading => _loading;
-    String? get error => _error;
-    List<LieuApiResult> get lieux => _lieux;
-    LieuType get type => _type;
-    bool get loadingLieux => _loadingLieux;
-    bool get isFavoriActuel => _isFavoriActuel;
-    bool get isVisiteeActuelle => _isVisiteeActuelle;
-    bool get isExploreeActuelle => _isExploreeActuelle;
-    List<Lieu> get lieuxFavoris => _lieuxFavoris;
-    int? get pinnedVilleId => _pinnedVilleId;
+  bool get isFavoriActuel => _isFavoriActuel;
+  bool get isVisiteeActuelle => _isVisiteeActuelle;
+  bool get isExploreeActuelle => _isExploreeActuelle;
 
-    /// Centre à afficher sur la carte (prend météo > ville > défaut)
-    LatLng get mapCenter {
-      if (_weather != null) return _weather!.coordonnees;
-      if (_ville != null) return LatLng(_ville!.lat, _ville!.lon);
-      return _defaultCenter;
+  List<Lieu> get lieuxFavoris => _lieuxFavoris;
+  int? get pinnedVilleId => _pinnedVilleId;
+
+  // Centre de carte
+  // On préfère les coordonnées météo car c est la ville réelle de l API
+  LatLng get mapCenter {
+    if (_weather != null) return _weather!.coordonnees;
+    if (_ville != null) return LatLng(_ville!.lat, _ville!.lon);
+    return _defaultCenter;
+  }
+
+  // Petites méthodes internes pour éviter de répéter du code
+  void _setLoading(bool value) {
+    _loading = value;
+    notifyListeners();
+  }
+
+  void _setError(String? value) {
+    _error = value;
+    notifyListeners();
+  }
+
+  void _setLoadingLieux(bool value) {
+    _loadingLieux = value;
+    notifyListeners();
+  }
+
+  // Reset complet
+  void reset() {
+    _weather = null;
+    _ville = null;
+    _error = null;
+
+    _loading = false;
+
+    _lieux = <LieuApiResult>[];
+    _type = LieuType.parc;
+    _loadingLieux = false;
+
+    _isFavoriActuel = false;
+    _isVisiteeActuelle = false;
+    _isExploreeActuelle = false;
+
+    _lieuxFavoris = <Lieu>[];
+    _pinnedVilleId = null;
+
+    notifyListeners();
+  }
+
+  // Trouver une ville en base par nom
+  // On compare en minuscule pour éviter les différences Paris paris etc
+  Future<Ville?> _trouverVilleParNom(String nom) async {
+    final list = await _villeRepo.searchVillesByName(nom);
+    final cible = nom.toLowerCase();
+
+    for (final v in list) {
+      if (v.nom.toLowerCase() == cible) return v;
     }
+    return null;
+  }
 
-    // (G) Reset complet -------------------------------------------------------
-    void reset() {
-      _weather = null;
-      _ville = null;
-      _error = null;
-      _loading = false;
-      _lieux = <LieuApiResult>[];
-      _type = LieuType.parc;
-      _loadingLieux = false;
+  // Mettre à jour les indicateurs de la ville courante à partir de la base
+  Future<void> _synchroniserStatutsVilleCourante() async {
+    if (_weather == null) {
       _isFavoriActuel = false;
       _isVisiteeActuelle = false;
       _isExploreeActuelle = false;
+      notifyListeners();
+      return;
+    }
+
+    final existing = await _trouverVilleParNom(_weather!.cityName);
+    _isFavoriActuel = existing?.isFavorie == true;
+    _isVisiteeActuelle = existing?.isVisitee == true;
+    _isExploreeActuelle = existing?.isExploree == true;
+
+    notifyListeners();
+  }
+
+  // Récupérer la ville courante en base
+  // Si elle n existe pas on l insère
+  Future<Ville?> _getOrInsertVilleCourante() async {
+    if (_weather == null) return null;
+
+    final existing = await _trouverVilleParNom(_weather!.cityName);
+    if (existing != null) return existing;
+
+    final nouvelle = Ville(
+      nom: _weather!.cityName,
+      latitude: _weather!.coordonnees.latitude,
+      longitude: _weather!.coordonnees.longitude,
+      isFavorie: _isFavoriActuel,
+      isVisitee: _isVisiteeActuelle,
+      isExploree: _isExploreeActuelle,
+    );
+
+    final id = await _villeRepo.insertVille(nouvelle);
+    return nouvelle.copyWith(id: id);
+  }
+
+  // Charger les lieux favoris stockés en base pour une ville
+  Future<void> _chargerLieuxFavorisPourVille(Ville ville) async {
+    if (ville.id == null) return;
+    _lieuxFavoris = await _lieuRepo.getLieuxByVilleId(ville.id!);
+    notifyListeners();
+  }
+
+  // Charger les lieux favoris pour la ville courante
+  Future<void> _chargerFavorisVilleCourante() async {
+    if (_weather == null) {
       _lieuxFavoris = <Lieu>[];
-      _pinnedVilleId = null;
       notifyListeners();
+      return;
     }
 
-    // (H) Outils DB ville -----------------------------------------------------
-    Future<Ville?> _trouverVilleParNom(String nom) async {
-      final list = await _villeRepo.searchVillesByName(nom);
-      for (final v in list) {
-        if (v.nom.toLowerCase() == nom.toLowerCase()) return v;
-      }
-      return null;
-    }
-
-    Future<void> _synchroniserFavoriActuel() async {
-      if (_weather == null) {
-        _isFavoriActuel = false;
-        _isVisiteeActuelle = false;
-        _isExploreeActuelle = false;
-        return;
-      }
-      final existing = await _trouverVilleParNom(_weather!.cityName);
-      _isFavoriActuel = existing?.isFavorie == true;
-      _isVisiteeActuelle = existing?.isVisitee == true;
-      _isExploreeActuelle = existing?.isExploree == true;
+    final v = await _trouverVilleParNom(_weather!.cityName);
+    if (v?.id == null) {
+      _lieuxFavoris = <Lieu>[];
       notifyListeners();
+      return;
     }
 
-    Future<Ville?> _getOrInsertVilleCourante() async {
-      if (_weather == null) return null;
-      final existing = await _trouverVilleParNom(_weather!.cityName);
-      if (existing != null) return existing;
+    await _chargerLieuxFavorisPourVille(v!);
+  }
 
+  // SharedPreferences
+  Future<void> chargerPinnedDepuisPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _pinnedVilleId = prefs.getInt('pinned_ville_id');
+    notifyListeners();
+  }
+
+  Future<void> epinglerVille(Ville ville) async {
+    if (ville.id == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('pinned_ville_id', ville.id!);
+    _pinnedVilleId = ville.id;
+    notifyListeners();
+  }
+
+  Future<void> deseEpinglerVille() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('pinned_ville_id');
+    _pinnedVilleId = null;
+    notifyListeners();
+  }
+
+  Future<void> afficherVilleEpinglee() async {
+    if (_pinnedVilleId == null) return;
+    final v = await _villeRepo.getVilleById(_pinnedVilleId!);
+    if (v != null) await chercherVille(v.nom);
+  }
+
+  // Favoris villes
+  Future<void> marquerFavori(Ville ville) async {
+    if (ville.id == null) {
+      await _villeRepo.insertVille(ville.copyWith(isFavorie: true));
+    } else {
+      await _villeRepo.updateVille(ville.copyWith(isFavorie: true));
+    }
+
+    _isFavoriActuel = true;
+    notifyListeners();
+  }
+
+  Future<void> retirerFavori(Ville ville) async {
+    if (ville.id != null) {
+      await _villeRepo.updateVille(ville.copyWith(isFavorie: false));
+    }
+
+    _isFavoriActuel = false;
+    notifyListeners();
+  }
+
+  Future<List<Ville>> chargerFavoris() async {
+    return _villeRepo.getVillesFavorites();
+  }
+
+  Future<void> supprimerVille(int id) async {
+    Ville? current;
+    if (_weather != null) {
+      current = await _trouverVilleParNom(_weather!.cityName);
+    }
+
+    await _villeRepo.deleteVille(id);
+
+    if (_pinnedVilleId == id) _pinnedVilleId = null;
+    if (current?.id == id) reset();
+
+    notifyListeners();
+  }
+
+  // Proposer plusieurs villes via Nominatim
+  Future<List<VilleApiResult>> proposerVilles(String nomVille) async {
+    return ApiVillesEtLieux.fetchVillesDepuisNominatimList(nomVille);
+  }
+
+  // Appliquer une ville sélectionnée depuis la liste
+  Future<void> appliquerVilleSelectionnee(VilleApiResult ville) async {
+    _ville = ville;
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      _weather = await ApiMeteo.fetchParCoordonnees(
+        latitude: ville.lat,
+        longitude: ville.lon,
+      );
+
+      await _chargerLieux(type: _type);
+      await _synchroniserStatutsVilleCourante();
+      await _chargerFavorisVilleCourante();
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Recherche simple par nom
+  Future<void> chercherVille(String nomVille) async {
+    final query = nomVille.trim();
+
+    if (query.isEmpty) {
+      _setError('Saisis une ville');
+      return;
+    }
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final villeTrouvee = await ApiVillesEtLieux.fetchVilleDepuisNominatim(
+        query,
+      );
+      final meteo = await ApiMeteo.fetchParVille(query);
+
+      _ville = villeTrouvee;
+      _weather = meteo;
+
+      await _chargerLieux(type: _type);
+      await _synchroniserStatutsVilleCourante();
+      await _chargerFavorisVilleCourante();
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Accès direct à un lieu favori par id
+  Future<Lieu?> getLieuById(int id) async {
+    return _lieuRepo.getLieuById(id);
+  }
+
+  // Changer le type courant et recharger les POI
+  Future<void> changerType(LieuType type) async {
+    _type = type;
+    notifyListeners();
+    await _chargerLieux(type: type);
+  }
+
+  // Favori ville courante
+  Future<void> basculerFavoriActuel() async {
+    if (_weather == null) return;
+
+    final nom = _weather!.cityName;
+    final existing = await _trouverVilleParNom(nom);
+
+    if (existing == null) {
       final nouvelle = Ville(
-        nom: _weather!.cityName,
-        latitude: _weather?.coordonnees.latitude,
-        longitude: _weather?.coordonnees.longitude,
-        isFavorie: _isFavoriActuel,
+        nom: nom,
+        latitude: _weather!.coordonnees.latitude,
+        longitude: _weather!.coordonnees.longitude,
+        isFavorie: true,
         isVisitee: _isVisiteeActuelle,
         isExploree: _isExploreeActuelle,
       );
-      final id = await _villeRepo.insertVille(nouvelle);
-      return nouvelle.copyWith(id: id);
-    }
-
-    Future<void> _chargerLieuxFavorisPourVille(Ville ville) async {
-      _lieuxFavoris = await _lieuRepo.getLieuxByVilleId(ville.id!);
-      notifyListeners();
-    }
-
-    Future<void> _chargerFavorisVilleCourante() async {
-      if (_weather == null) {
-        _lieuxFavoris = <Lieu>[];
-        notifyListeners();
-        return;
-      }
-      final v = await _trouverVilleParNom(_weather!.cityName);
-      if (v?.id != null) {
-        await _chargerLieuxFavorisPourVille(v!);
+      await marquerFavori(nouvelle);
+    } else {
+      if (existing.isFavorie) {
+        await retirerFavori(existing);
       } else {
-        _lieuxFavoris = <Lieu>[];
-        notifyListeners();
+        await marquerFavori(existing);
       }
     }
 
-    // (I) Pinned city (SharedPrefs) -------------------------------------------
-    Future<void> chargerPinnedDepuisPrefs() async {
-      final prefs = await SharedPreferences.getInstance();
-      _pinnedVilleId = prefs.getInt('pinned_ville_id');
+    await _synchroniserStatutsVilleCourante();
+  }
+
+  Future<void> basculerVisiteeActuelle() async {
+    if (_weather == null) return;
+
+    final existing = await _trouverVilleParNom(_weather!.cityName);
+
+    if (existing == null) {
+      final v = await _getOrInsertVilleCourante();
+      if (v == null) return;
+
+      await _villeRepo.updateVille(v.copyWith(isVisitee: true));
+      _isVisiteeActuelle = true;
+      await _chargerFavorisVilleCourante();
       notifyListeners();
+      return;
     }
 
-    Future<void> epinglerVille(Ville ville) async {
-      if (ville.id == null) return;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('pinned_ville_id', ville.id!);
-      _pinnedVilleId = ville.id;
+    final updated = existing.copyWith(isVisitee: !existing.isVisitee);
+    await _villeRepo.updateVille(updated);
+    _isVisiteeActuelle = updated.isVisitee;
+    notifyListeners();
+  }
+
+  Future<void> basculerExploreeActuelle() async {
+    if (_weather == null) return;
+
+    final existing = await _trouverVilleParNom(_weather!.cityName);
+
+    if (existing == null) {
+      final v = await _getOrInsertVilleCourante();
+      if (v == null) return;
+
+      await _villeRepo.updateVille(v.copyWith(isExploree: true));
+      _isExploreeActuelle = true;
+      await _chargerFavorisVilleCourante();
       notifyListeners();
+      return;
     }
 
-    Future<void> deseEpinglerVille() async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('pinned_ville_id');
-      _pinnedVilleId = null;
-      notifyListeners();
-    }
+    final updated = existing.copyWith(isExploree: !existing.isExploree);
+    await _villeRepo.updateVille(updated);
+    _isExploreeActuelle = updated.isExploree;
+    notifyListeners();
+  }
 
-    Future<void> afficherVilleEpinglee() async {
-      if (_pinnedVilleId == null) return;
-      final v = await _villeRepo.getVilleById(_pinnedVilleId!);
-      if (v != null) await chercherVille(v.nom);
-    }
+  // Lieux favoris
+  Future<void> ajouterLieuFavori(LieuApiResult poi) async {
+    if (_weather == null) return;
 
-    // (J) Gestion favoris villes ---------------------------------------------
-    Future<void> marquerFavori(Ville ville) async {
-      if (ville.id == null) {
-        await _villeRepo.insertVille(ville.copyWith(isFavorie: true));
-      } else {
-        await _villeRepo.updateVille(ville.copyWith(isFavorie: true));
-      }
-      _isFavoriActuel = true;
-      notifyListeners();
-    }
+    final villeCourante = await _getOrInsertVilleCourante();
+    if (villeCourante?.id == null) return;
 
-    Future<void> retirerFavori(Ville ville) async {
-      if (ville.id != null) {
-        await _villeRepo.updateVille(ville.copyWith(isFavorie: false));
-      }
-      _isFavoriActuel = false;
-      notifyListeners();
-    }
+    final deja = await _lieuRepo.getLieuByNomEtVille(
+      poi.name,
+      villeCourante!.id!,
+    );
 
-    Future<List<Ville>> chargerFavoris() async => _villeRepo.getVillesFavorites();
-
-    Future<void> supprimerVille(int id) async {
-      Ville? current;
-      if (_weather != null) current = await _trouverVilleParNom(_weather!.cityName);
-
-      await _villeRepo.deleteVille(id);
-      if (_pinnedVilleId == id) _pinnedVilleId = null;
-      if (current?.id == id) reset();
-      notifyListeners();
-    }
-
-    // (K) Sélection multiple de villes (Nominatim) ----------------------------
-    Future<List<VilleApiResult>> proposerVilles(String nomVille) async {
-      return ApiVillesEtLieux.fetchVillesDepuisNominatimList(nomVille);
-    }
-
-    Future<void> appliquerVilleSelectionnee(VilleApiResult ville) async {
-      _ville = ville; // conserve bbox
-      _loading = true;
-      _error = null;
-      notifyListeners();
-      try {
-        final meteo = await ApiMeteo.fetchParCoordonnees(
-          latitude: ville.lat,
-          longitude: ville.lon,
-        );
-        _weather = meteo;
-        await _chargerLieux(type: _type);
-        await _synchroniserFavoriActuel();
-        await _chargerFavorisVilleCourante();
-      } catch (e) {
-        _error = e.toString();
-      } finally {
-        _loading = false;
-        notifyListeners();
-      }
-    }
-
-    // (L) Recherche ville + météo (simple) -----------------------------------
-    Future<void> chercherVille(String nomVille) async {
-      final query = nomVille.trim();
-      if (query.isEmpty) {
-        _error = 'Saisis une ville';
-        notifyListeners();
-        return;
-      }
-
-      _loading = true;
-      _error = null;
-      notifyListeners();
-
-      try {
-        final villeTrouvee = await ApiVillesEtLieux.fetchVilleDepuisNominatim(query);
-        final meteo = await ApiMeteo.fetchParVille(query);
-
-        _ville = villeTrouvee;
-        _weather = meteo;
-        await _chargerLieux(type: _type);
-        await _synchroniserFavoriActuel();
-        await _chargerFavorisVilleCourante();
-      } catch (e) {
-        _error = e.toString();
-      } finally {
-        _loading = false;
-        notifyListeners();
-      }
-    }
-
-    // (M) Lieux favoris : CRUD ------------------------------------------------
-    Future<Lieu?> getLieuById(int id) async => _lieuRepo.getLieuById(id);
-
-    Future<void> changerType(LieuType type) async {
-      _type = type;
-      await _chargerLieux(type: type);
-    }
-
-    Future<void> basculerFavoriActuel() async {
-      if (_weather == null) return;
-      final nom = _weather!.cityName;
-      final existing = await _trouverVilleParNom(nom);
-
-      if (existing == null) {
-        final nouvelle = Ville(
-          nom: nom,
-          pays: null,
-          latitude: _weather?.coordonnees.latitude,
-          longitude: _weather?.coordonnees.longitude,
-          isFavorie: true,
-          isVisitee: _isVisiteeActuelle,
-          isExploree: _isExploreeActuelle,
-        );
-        await marquerFavori(nouvelle);
-      } else {
-        if (existing.isFavorie) {
-          await retirerFavori(existing);
-        } else {
-          await marquerFavori(existing);
-        }
-      }
-      await _synchroniserFavoriActuel();
-    }
-
-    Future<void> basculerVisiteeActuelle() async {
-      if (_weather == null) return;
-      final existing = await _trouverVilleParNom(_weather!.cityName);
-      if (existing == null) {
-        final v = await _getOrInsertVilleCourante();
-        if (v != null) {
-          await _villeRepo.updateVille(v.copyWith(isVisitee: true));
-          _isVisiteeActuelle = true;
-          await _chargerFavorisVilleCourante();
-        }
-      } else {
-        final updated = existing.copyWith(isVisitee: !existing.isVisitee);
-        await _villeRepo.updateVille(updated);
-        _isVisiteeActuelle = updated.isVisitee;
-      }
-      notifyListeners();
-    }
-
-    Future<void> basculerExploreeActuelle() async {
-      if (_weather == null) return;
-      final existing = await _trouverVilleParNom(_weather!.cityName);
-      if (existing == null) {
-        final v = await _getOrInsertVilleCourante();
-        if (v != null) {
-          await _villeRepo.updateVille(v.copyWith(isExploree: true));
-          _isExploreeActuelle = true;
-          await _chargerFavorisVilleCourante();
-        }
-      } else {
-        final updated = existing.copyWith(isExploree: !existing.isExploree);
-        await _villeRepo.updateVille(updated);
-        _isExploreeActuelle = updated.isExploree;
-      }
-      notifyListeners();
-    }
-
-    Future<void> ajouterLieuFavori(LieuApiResult poi) async {
-      if (_weather == null) return;
-      final villeCourante = await _getOrInsertVilleCourante();
-      if (villeCourante == null || villeCourante.id == null) return;
-
-      final deja = await _lieuRepo.getLieuByNomEtVille(poi.name, villeCourante.id!);
-      if (deja != null) {
-        await _chargerLieuxFavorisPourVille(villeCourante);
-        return;
-      }
-
-      final lieu = Lieu(
-        villeId: villeCourante.id!,
-        nom: poi.name.isEmpty ? '(Sans nom)' : poi.name,
-        type: _type,
-        latitude: poi.lat,
-        longitude: poi.lon,
-        description: poi.formattedAddress,
-      );
-      await _lieuRepo.insertLieu(lieu);
+    if (deja != null) {
       await _chargerLieuxFavorisPourVille(villeCourante);
-
-      final exists = _lieux.any((l) => l.name == poi.name && l.lat == poi.lat && l.lon == poi.lon);
-      if (!exists) {
-        _lieux = [..._lieux, poi];
-        notifyListeners();
-      }
+      return;
     }
 
-    Future<void> mettreAJourLieu(Lieu lieu) async {
-      if (lieu.id == null) return;
-      await _lieuRepo.updateLieu(lieu);
-      _lieuxFavoris = _lieuxFavoris.map((l) => l.id == lieu.id ? lieu : l).toList(growable: false);
+    final lieu = Lieu(
+      villeId: villeCourante.id!,
+      nom: poi.name.isEmpty ? '(Sans nom)' : poi.name,
+      type: _type,
+      latitude: poi.lat,
+      longitude: poi.lon,
+      description: poi.formattedAddress,
+    );
+
+    await _lieuRepo.insertLieu(lieu);
+    await _chargerLieuxFavorisPourVille(villeCourante);
+
+    final exists = _lieux.any(
+      (l) => l.name == poi.name && l.lat == poi.lat && l.lon == poi.lon,
+    );
+
+    if (!exists) {
+      _lieux = [..._lieux, poi];
       notifyListeners();
     }
+  }
 
-    Future<void> supprimerLieuFavori(int id) async {
-      await _lieuRepo.deleteLieu(id);
-      _lieuxFavoris = _lieuxFavoris.where((l) => l.id != id).toList();
+  Future<void> mettreAJourLieu(Lieu lieu) async {
+    if (lieu.id == null) return;
+
+    await _lieuRepo.updateLieu(lieu);
+
+    _lieuxFavoris = _lieuxFavoris
+        .map((l) => l.id == lieu.id ? lieu : l)
+        .toList(growable: false);
+
+    notifyListeners();
+  }
+
+  Future<void> supprimerLieuFavori(int id) async {
+    await _lieuRepo.deleteLieu(id);
+    _lieuxFavoris = _lieuxFavoris.where((l) => l.id != id).toList();
+    notifyListeners();
+  }
+
+  // Charger les POI
+  // On a besoin d une ville avec une bbox
+  Future<void> _chargerLieux({required LieuType type}) async {
+    final bbox = _ville?.bbox;
+    if (bbox == null) return;
+
+    _lieux = <LieuApiResult>[];
+    _setLoadingLieux(true);
+
+    try {
+      _lieux = await ApiVillesEtLieux.fetchLieuxPourVille(
+        type: type,
+        limit: 15,
+        bboxOverride: bbox,
+      );
       notifyListeners();
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoadingLieux(false);
     }
+  }
 
-    // (N) Chargement des POI (bbox obligatoire) -------------------------------
-    Future<void> _chargerLieux({required LieuType type}) async {
-      _lieux = <LieuApiResult>[];
-      _loadingLieux = true;
-      notifyListeners();
-      try {
-        final data = await ApiVillesEtLieux.fetchLieuxPourVille(
-          type: type,
-          limit: 15,
-          bboxOverride: _ville?.bbox,
-        );
-        _lieux = data;
-      } catch (e) {
-        _error = e.toString();
-      } finally {
-        _loadingLieux = false;
-        notifyListeners();
-      }
-    }
-
-    /// Recherche des lieux par nom dans la ville sélectionnée (via bbox).
+  // Recherche de lieux par nom dans la ville courante
   Future<List<LieuApiResult>> chercherLieuxParNom(
     String nomLieu, {
     int limit = 10,
     LieuType? type,
   }) async {
+    final bbox = _ville?.bbox;
+    if (bbox == null) return <LieuApiResult>[];
+
     return ApiVillesEtLieux.fetchLieuxParNomDansVille(
       nomLieu: nomLieu,
       type: type ?? _type,
-      bboxOverride: _ville?.bbox,
+      bboxOverride: bbox,
       limit: limit,
     );
   }
 
-  /// Ajoute un lieu personnalisé à la position cliquée sur la carte.
-  /// - Vérifie la présence d’une ville et d’un bbox
-  /// - Vérifie que le point est dans le bbox courant
-  /// - Insère en base et recharge les favoris
-  /// Retourne null si succès, sinon un message d’erreur.
+  // Ajout d un lieu personnalisé
+  // On vérifie que le point est dans la bbox pour éviter les incohérences
+  // On insère ensuite en base puis on recharge les favoris
   Future<String?> ajouterLieuPersonnalise({
     required double lat,
     required double lon,
@@ -439,36 +506,36 @@
   }) async {
     final bbox = _ville?.bbox;
     if (_weather == null || bbox == null) {
-      return 'Aucune ville courante ou bbox indisponible.';
+      return 'Aucune ville courante ou bbox indisponible';
     }
 
-    final dansBBox = lat >= bbox.latMin &&
+    final dansBBox =
+        lat >= bbox.latMin &&
         lat <= bbox.latMax &&
         lon >= bbox.lonMin &&
         lon <= bbox.lonMax;
+
     if (!dansBBox) {
-      return 'Le point sélectionné est hors de la zone de la ville.';
+      return 'Le point sélectionné est hors de la zone de la ville';
     }
 
     final villeCourante = await _getOrInsertVilleCourante();
-    if (villeCourante == null || villeCourante.id == null) {
-      return 'Impossible de récupérer la ville courante.';
+    if (villeCourante?.id == null) {
+      return 'Impossible de récupérer la ville courante';
     }
 
     final lieu = Lieu(
-      villeId: villeCourante.id!,
+      villeId: villeCourante!.id!,
       nom: nom.isEmpty ? '(Sans nom)' : nom,
       type: type,
       latitude: lat,
       longitude: lon,
       description: description ?? '',
     );
-    await _lieuRepo.insertLieu(lieu);
 
-    // Recharge les favoris pour rester synchronisé
+    await _lieuRepo.insertLieu(lieu);
     await _chargerLieuxFavorisPourVille(villeCourante);
 
-    // On ne l'ajoute pas à la liste des POI affichés (restera seulement en base)
     notifyListeners();
     return null;
   }

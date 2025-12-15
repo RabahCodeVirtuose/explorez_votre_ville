@@ -1,7 +1,10 @@
+//
+// Ici on définit les types possibles pour un lieu
+// On utilise un enum pour éviter les fautes de frappe
+// En base on stocke une string qui correspond à type name
+
 import 'package:flutter/material.dart';
 
-/// Types possibles de lieux dans l'application.
-/// Le texte stocké en base sera le name() de l'énum (musee, parc, restaurant, ...).
 enum LieuType {
   musee,
   parc,
@@ -15,7 +18,8 @@ enum LieuType {
 }
 
 class LieuTypeHelper {
-  /// Convertit une chaîne de la base (ex: "musee") en valeur de l'énumération.
+  // On convertit une string venant de la base en enum
+  // Si la valeur est inconnue on met un type par défaut
   static LieuType fromDb(String value) {
     return LieuType.values.firstWhere(
       (t) => t.name == value,
@@ -23,10 +27,13 @@ class LieuTypeHelper {
     );
   }
 
-  /// Convertit une valeur de l'énum en chaîne pour la base (ex: "musee").
-  static String toDb(LieuType type) => type.name;
+  // On convertit un enum en string pour pouvoir le stocker en base
+  static String toDb(LieuType type) {
+    return type.name;
+  }
 
-  /// Libellé lisible pour l'UI.
+  // On retourne un libellé lisible pour l interface
+  // Ça permet d afficher autre chose que musee ou salleConcert
   static String label(LieuType type) {
     switch (type) {
       case LieuType.musee:
@@ -50,7 +57,8 @@ class LieuTypeHelper {
     }
   }
 
-  /// Icône Material associée à chaque type (fallback: location_on).
+  // On associe une icône Material à chaque type
+  // Ça aide l utilisateur à comprendre vite
   static IconData icon(LieuType type) {
     switch (type) {
       case LieuType.musee:
@@ -70,11 +78,12 @@ class LieuTypeHelper {
       case LieuType.cinema:
         return Icons.movie;
       case LieuType.salleConcert:
-        return Icons.music_note; // proche visuel pour salle de concert
+        return Icons.music_note;
     }
   }
 
-  /// Couleur associée à chaque type (pour les icônes ou chips).
+  // On associe une couleur à chaque type
+  // On s en sert pour les icônes ou les petits badges
   static Color color(LieuType type) {
     switch (type) {
       case LieuType.musee:

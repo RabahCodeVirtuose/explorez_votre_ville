@@ -2,12 +2,21 @@ import 'package:explorez_votre_ville/api/api_villes.dart';
 import 'package:explorez_votre_ville/models/lieu_type.dart';
 import 'package:flutter/material.dart';
 
-/// Boite de dialogue qui affiche le détail d'un POI et permet de l'ajouter
-/// aux favoris locaux via le callback [onAdd].
+// PoiDetailsDialog
+// On affiche une boite de dialogue quand on tape sur un POI sur la carte
+// On montre les infos utiles du lieu
+// On laisse l utilisateur soit fermer soit ajouter le lieu aux favoris
 class PoiDetailsDialog extends StatelessWidget {
+  // Le POI qu on veut afficher
   final LieuApiResult poi;
+
+  // Callback fourni par le parent
+  // Le parent décide quoi faire quand on clique sur ajouter
   final VoidCallback onAdd;
-  final LieuType currentType; // type sélectionné dans l'app
+
+  // Le type actuellement sélectionné dans l app
+  // On l utilise pour afficher un libellé clair dans la boite de dialogue
+  final LieuType currentType;
 
   const PoiDetailsDialog({
     super.key,
@@ -18,37 +27,60 @@ class PoiDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On récupère le libellé lisible du type
     final typeLabel = LieuTypeHelper.label(currentType);
+
+    // On récupère le theme pour éviter de répéter Theme.of(context) partout
+    final cs = Theme.of(context).colorScheme;
+
     return AlertDialog(
-      title: Text(poi.name),
+      // Titre principal
+      // Si le nom est vide on met un fallback pour éviter un titre vide
+      title: Text(poi.name.isEmpty ? '(Sans nom)' : poi.name),
+
+      // Le contenu peut dépasser sur mobile donc on met un scroll
       content: SingleChildScrollView(
         child: ListBody(
-          children: <Widget>[
+          children: [
+            // Ligne 1 le type sélectionné dans l app
             Text('Type : $typeLabel'),
+
+            // Ligne 2 coordonnées arrondies pour rester lisibles
             Text(
               'Coordonnées : ${poi.lat.toStringAsFixed(4)}, ${poi.lon.toStringAsFixed(4)}',
             ),
+
+            // Ligne 3 adresse si elle existe
+            // On garde un petit style mais simple
             if (poi.formattedAddress.isNotEmpty)
-              Text(
-                poi.formattedAddress,
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  poi.formattedAddress,
+                  style: TextStyle(color: cs.onSurface.withOpacity(0.85)),
+                ),
               ),
           ],
         ),
       ),
-      actions: <Widget>[
+
+      // Actions en bas de la boite de dialogue
+      actions: [
+        // Fermer ne fait rien de spécial
+        // On ferme juste la boite de dialogue
         TextButton(
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Fermer'),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
         ),
+
+        // Ajouter appelle le callback du parent
+        // Puis on ferme la boite de dialogue
         ElevatedButton.icon(
           icon: const Icon(Icons.add_location_alt),
           label: const Text('Ajouter à mes lieux favoris'),
           onPressed: () {
-            onAdd(); // ajoute en base
-            Navigator.of(context).pop(); // ferme la boite de dialogue
+            onAdd();
+            Navigator.of(context).pop();
           },
         ),
       ],

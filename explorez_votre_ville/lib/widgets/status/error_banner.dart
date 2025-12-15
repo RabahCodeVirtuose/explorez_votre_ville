@@ -1,3 +1,9 @@
+//
+// Ce widget sert à afficher une erreur de façon simple et visible
+// On lui donne juste un message
+// On l utilise quand une API ou une action échoue
+// On reste sobre avec une couleur rouge légère et une icône
+
 import 'package:flutter/material.dart';
 
 class ErrorBanner extends StatelessWidget {

@@ -1,32 +1,41 @@
-// lib/providers/theme_provider.dart
 //
-// Gère le thème clair/sombre à partir de deux palettes définies.
-// Expose :
-// - themeMode (clair/sombre)
-// - lightTheme / darkTheme (ColorScheme + quelques réglages AppBar/scaffold)
-// - toggleTheme() et setThemeMode()
+// Ce provider sert à gérer le thème clair et sombre
+// On stocke juste un ThemeMode
+// L UI écoute ce provider et se met à jour quand on change le mode
+//
+// On définit deux palettes de couleurs
+// Une palette pour le thème clair
+// Une palette pour le thème sombre
+//
+// On expose
+// themeMode pour savoir si on est en clair ou en sombre
+// lightTheme et darkTheme pour fournir le ThemeData à MaterialApp
+// toggleTheme pour basculer
+// setThemeMode pour choisir un mode précis
 
 import 'package:flutter/material.dart';
 
 class ThemeProvider with ChangeNotifier {
   ThemeMode _mode = ThemeMode.light;
+
   ThemeMode get themeMode => _mode;
 
-  // Palette claire
+  // Couleurs du thème clair
   static const Color _deepGreen = Color(0xFF18534F);
   static const Color _teal = Color(0xFF226D68);
   static const Color _mint = Color(0xFFECF8F6);
   static const Color _amber = Color(0xFFFEEAA1);
   static const Color _copper = Color(0xFFD6955B);
 
-  // Palette sombre
+  // Couleurs du thème sombre
   static const Color _charcoal1 = Color(0xFF242423);
   static const Color _charcoal2 = Color(0xFF333533);
   static const Color _sun = Color(0xFFF5CB5C);
   static const Color _offWhite = Color(0xFFE8EDDF);
   static const Color _grey = Color(0xFFCFDBD5);
 
-  /// Thème clair (ColorScheme + AppBar/scaffold)
+  // Thème clair
+  // On construit un ColorScheme puis on le met dans ThemeData
   ThemeData get lightTheme {
     final scheme = ColorScheme.light(
       primary: _teal,
@@ -39,17 +48,17 @@ class ThemeProvider with ChangeNotifier {
       onSurface: _deepGreen,
       tertiary: _amber,
     );
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: _mint,
-      appBarTheme: const AppBarTheme(
-        elevation: 0,
-      ),
+      appBarTheme: const AppBarTheme(elevation: 0),
     );
   }
 
-  /// Thème sombre (ColorScheme + AppBar/scaffold)
+  // Thème sombre
+  // Même idée mais avec des couleurs adaptées à un fond foncé
   ThemeData get darkTheme {
     final scheme = ColorScheme.dark(
       primary: _offWhite,
@@ -62,23 +71,24 @@ class ThemeProvider with ChangeNotifier {
       onSurface: _offWhite,
       tertiary: _sun,
     );
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: _charcoal1,
-      appBarTheme: const AppBarTheme(
-        elevation: 0,
-      ),
+      appBarTheme: const AppBarTheme(elevation: 0),
     );
   }
 
-  /// Bascule clair <-> sombre
+  // On bascule entre clair et sombre
+  // On notifie pour que MaterialApp reconstruise le thème
   void toggleTheme() {
     _mode = _mode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
   }
 
-  /// Fixe explicitement le mode (utile pour persister plus tard si besoin)
+  // On force un mode précis
+  // Ça peut servir plus tard si on veut sauvegarder le choix
   void setThemeMode(ThemeMode mode) {
     _mode = mode;
     notifyListeners();

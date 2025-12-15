@@ -1,8 +1,10 @@
-// lib/utils/lieu_type_mapper.dart
+//
+// Ici on fait la traduction entre notre enum LieuType et les catégories Geoapify
+// Geoapify attend des strings précises comme catering cafe ou leisure park
+// On centralise ça ici pour éviter de recopier les strings partout
 
 import '../models/lieu_type.dart';
 
-/// Traduit notre enumeration `LieuType` en categories Geoapify valides.
 String geoapifyCategoryFromLieuType(LieuType type) {
   switch (type) {
     case LieuType.musee:
