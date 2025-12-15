@@ -9,8 +9,7 @@ et lieux favoris avec une persistance locale.
 
 ## Objectif du projet
 
-L’objectif principal de ce projet est de mettre en pratique les concepts vus en
-cours de développement mobile, notamment :
+L’objectif principal de ce projet est :
 
 - la conception d’une application Flutter bien structurée
 - l’utilisation d’API externes pour récupérer des données en temps réel
@@ -19,9 +18,7 @@ cours de développement mobile, notamment :
 - la mise en place d’une interface utilisateur responsive et adaptée
   aux thèmes clair et sombre
 
-Ce projet vise également à renforcer la compréhension de l’architecture d’une
-application Flutter complète, depuis la récupération des données jusqu’à leur
-affichage.
+
 
 ---
 
@@ -82,6 +79,13 @@ et la maintenance du code :
 - Flutter Map pour l’affichage cartographique
 - API OpenWeather pour la météo
 - API Nominatim / Geoapify pour la recherche de villes et de lieux
+
+---
+## Important
+
+La persistance des données via SQLite fonctionne uniquement sur Android.
+Il est donc nécessaire d’exécuter l’application sur un émulateur Android
+ou sur un appareil Android réel pour bénéficier de cette fonctionnalité.
 
 ---
 
